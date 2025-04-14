@@ -4,7 +4,7 @@ import requests
 from zipfile import ZipFile
 
 # Basis-URL des GitHub-Repos, in dem alle Pakete liegen
-REPO_URL = "https://github.com/username/repo"
+REPO_URL = "https://github.com/Lominub44/SigmaOS"
 PACKAGES_DIR = "packages"
 
 # Funktion zum Auflisten der Pakete im Repo (ligma list)
@@ -20,41 +20,43 @@ def list_packages():
 
 # Funktion zum Installieren eines Pakets (ligma install <paket>)
 def download_package(package_name):
-    # Sicherstellen, dass der Ordner "packages" existiert
+    # Ensure the "packages" directory exists
     if not os.path.exists(PACKAGES_DIR):
-        os.makedirs(PACKAGES_DIR)  # Ordner erstellen, falls nicht vorhanden
+        os.makedirs(PACKAGES_DIR)  # Create the directory if it doesn't exist
 
     package_dir = os.path.join(PACKAGES_DIR, package_name)
 
-    # Wenn das Paket bereits existiert, überspringen
+    # If the package already exists, skip downloading
     if os.path.exists(package_dir):
         print(f"Paket {package_name} bereits heruntergeladen.")
         return
 
-    # GitHub Repo URL für das Paket (Verwendung der "zipball"-URL)
+    # GitHub API URL to fetch the package directory contents
     download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
 
-    # Das Paket als ZIP herunterladen
+    # Download the package ZIP
     print(f"Lade {package_name} herunter...")
     zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
     response = requests.get(download_url)
 
     if response.status_code == 200:
-        # Speicher die ZIP-Datei lokal
+        # Save the ZIP file locally
         with open(zip_path, "wb") as f:
             f.write(response.content)
 
-        # Entpacke das ZIP-Archiv
+        # Extract the ZIP archive
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(PACKAGES_DIR)
 
-        os.remove(zip_path)  # ZIP nach dem Entpacken löschen
+        os.remove(zip_path)  # Delete the ZIP file after extraction
 
-        # Jetzt kannst du den gewünschten Ordner aus dem Repo entpacken
-        extracted_folder = os.path.join(PACKAGES_DIR, f"repo-main/{package_name}")
+        # Locate the specific package folder in the extracted files
+        extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-main", package_name)
         if os.path.exists(extracted_folder):
-            os.rename(extracted_folder, package_dir)  # Ordner umbenennen, falls notwendig
-
+            os.rename(extracted_folder, package_dir)  # Rename the folder if necessary
+            print(f"Paket {package_name} erfolgreich installiert.")
+        else:
+            print(f"Das Paket {package_name} wurde nicht im heruntergeladenen Archiv gefunden.")
     else:
         print(f"Fehler beim Herunterladen des Pakets {package_name}.")
 
