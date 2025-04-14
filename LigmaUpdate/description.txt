@@ -1,0 +1,1 @@
+Updates installed packages to their latest versions

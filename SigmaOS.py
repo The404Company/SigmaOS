@@ -78,6 +78,7 @@ def show_help():
         ("help", "Show this help message"),
         ("exit", "Exit SigmaOS"),
         ("clear", "Clear the screen"),
+        ("setup", "Install essential packages"),
         ("ligma list", "List available packages"),
         ("ligma install <pkg>", "Install a package"),
         ("alias list", "List all aliases"),
@@ -89,18 +90,82 @@ def show_help():
         print(f"{Fore.CYAN}  {cmd:<20}{Fore.WHITE} - {desc}")
     print(f"{Fore.YELLOW}╚{'═' * 24}╝{Style.RESET_ALL}")
 
+def setup_essential_packages():
+    essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper"]
+    
+    print(f"\n{Fore.CYAN}Installing essential packages...{Style.RESET_ALL}")
+    print(f"{Fore.WHITE}The following packages will be installed:{Style.RESET_ALL}")
+    for pkg in essential_packages:
+        print(f"{Fore.GREEN}  ▶ {pkg}")
+    
+    confirm = input(f"\n{Fore.YELLOW}Do you want to proceed? (y/N): {Style.RESET_ALL}")
+    if confirm.lower() != 'y':
+        print(f"{Fore.RED}Setup cancelled.{Style.RESET_ALL}")
+        return
+    
+    for pkg in essential_packages:
+        try:
+            if not is_valid_package(pkg):
+                print(f"\n{Fore.CYAN}Installing {pkg}...{Style.RESET_ALL}")
+                download_package(pkg)
+            else:
+                print(f"{Fore.YELLOW}Package {pkg} is already installed.{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}Error installing {pkg}: {e}{Style.RESET_ALL}")
+
+def get_package_description(package_name):
+    """Get package description from description.txt file"""
+    if not is_valid_package(package_name):
+        return "No description available"
+        
+    desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
+    try:
+        if os.path.exists(desc_file):
+            with open(desc_file, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+    except:
+        pass
+    return "No description available"
+
 def list_packages():
+    # Get installed packages first
+    installed_packages = []
+    if os.path.exists(PACKAGES_DIR):
+        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                            and not d.startswith('.') 
+                            and d != "SigmaOS-main"]
+
+    # Get available packages from repo
     headers = {'Accept': 'application/vnd.github.v3+json'}
     response = requests.get(f"https://api.github.com/repos/Lominub44/SigmaOS/contents/", headers=headers)
     loading_animation("Fetching packages...")
+    
     if response.status_code == 200:
         data = response.json()
-        packages_found = False
+        available_packages = [item["name"] for item in data 
+                            if item["type"] == "dir" and not item["name"].startswith('.')]
+        
         print(f"\n{Fore.CYAN}Available packages:{Style.RESET_ALL}")
-        for item in data:
-            if item["type"] == "dir" and not item["name"].startswith('.'):
+        packages_found = False
+        
+        # Show installed packages first
+        if installed_packages:
+            print(f"\n{Fore.GREEN}Installed:{Style.RESET_ALL}")
+            for pkg in installed_packages:
+                desc = get_package_description(pkg)
+                print(f"{Fore.GREEN}  ✓ {pkg:<15}{Fore.WHITE} - {desc}")
                 packages_found = True
-                print(f"{Fore.GREEN}  ▶ {item['name']}")
+        
+        # Show available but not installed packages
+        not_installed = [pkg for pkg in available_packages if pkg not in installed_packages]
+        if not_installed:
+            print(f"\n{Fore.YELLOW}Not Installed:{Style.RESET_ALL}")
+            for pkg in not_installed:
+                # For non-installed packages, we can't read the description yet
+                print(f"{Fore.WHITE}  ▶ {pkg:<15}")
+                packages_found = True
+        
         if not packages_found:
             print(f"{Fore.RED}No packages found in repository.{Style.RESET_ALL}")
     else:
@@ -152,18 +217,38 @@ def run_package(package_name):
 
     if not os.path.exists(package_dir):
         print(f"{Fore.RED}main.py not found in {package_name}.{Style.RESET_ALL}")
-        return
+        return False
 
     print(f"{Fore.CYAN}Running {package_name}/main.py...{Style.RESET_ALL}")
     # Pass any additional arguments after the package name
     args = [sys.executable, package_dir] + sys.argv[2:]
     subprocess.run(args)
+    return True  # Indicate successful package execution
 
 def is_valid_package(package_name):
     return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
 
+def show_welcome_message():
+    if not os.path.exists(PACKAGES_DIR) or not os.listdir(PACKAGES_DIR):
+        print(f"\n{Fore.CYAN}Welcome to SigmaOS!{Style.RESET_ALL}")
+        print(f"{Fore.WHITE}It looks like this is your first time using SigmaOS.")
+        print(f"To get started, try these commands:")
+        print(f"{Fore.GREEN}  setup{Fore.WHITE}     - Install essential packages")
+        print(f"{Fore.GREEN}  help{Fore.WHITE}      - Show all available commands")
+        print(f"{Fore.GREEN}  ligma list{Fore.WHITE} - Show available packages\n")
+
+def suggest_command(command):
+    """Suggest similar commands when user makes a typo"""
+    from difflib import get_close_matches
+    all_commands = ["help", "exit", "clear", "setup", "ligma list", "ligma install",
+                   "alias list", "alias add", "alias remove", "sigma help", "sigma quit"]
+    matches = get_close_matches(command, all_commands, n=1, cutoff=0.6)
+    if matches:
+        print(f"{Fore.YELLOW}Did you mean: {Fore.GREEN}{matches[0]}{Fore.YELLOW}?{Style.RESET_ALL}")
+
 def interactive_shell():
     show_banner()
+    show_welcome_message()  # Show welcome message for new users
     aliases = load_aliases()
     while True:
         try:
@@ -171,7 +256,7 @@ def interactive_shell():
 
             if command.lower() in ["exit", "sigma quit"]:
                 loading_animation("Shutting down SigmaOS")
-                break
+                sys.exit(0)  # Use sys.exit for definitive exit
 
             # Split command into parts
             parts = command.split()
@@ -180,6 +265,7 @@ def interactive_shell():
             if parts and is_valid_package(parts[0]):
                 sys.argv = parts  # Set sys.argv to include command arguments
                 run_package(parts[0])
+                show_banner()  # Refresh banner after package execution
                 continue
 
             # Check if command is an alias
@@ -188,6 +274,9 @@ def interactive_shell():
                 if len(parts) > 1:
                     command += " " + " ".join(parts[1:])
                 parts = command.split()
+                if command.lower() in ["exit", "sigma quit"]:  # Check if alias resolves to exit
+                    loading_animation("Shutting down SigmaOS")
+                    sys.exit(0)
 
             main_command = parts[0].lower() if parts else ""
             args = parts[1:]
@@ -204,9 +293,12 @@ def interactive_shell():
                     show_help()
                 elif main_command == "sigma" and args[0] == "quit":
                     loading_animation("Shutting down SigmaOS")
-                    break
+                    sys.exit(0)
                 else:
                     print(f"{Fore.RED}Unknown command: {command}{Style.RESET_ALL}")
+            
+            elif main_command == "setup":
+                setup_essential_packages()
             
             elif main_command == "ligma":
                 if args:
@@ -240,11 +332,12 @@ def interactive_shell():
             
             else:
                 print(f"{Fore.RED}Unknown command: {main_command}. Try 'help' for available commands.{Style.RESET_ALL}")
+                suggest_command(main_command)  # Suggest similar commands
 
         except KeyboardInterrupt:
             print(f"\n{Fore.RED}Interrupted!{Style.RESET_ALL}")
             loading_animation("Shutting down SigmaOS")
-            break
+            sys.exit(0)  # Use sys.exit here too
 
 if __name__ == "__main__":
     interactive_shell()
