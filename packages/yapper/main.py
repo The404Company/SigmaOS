@@ -69,18 +69,14 @@ def editor(filename=None):
     cursor_x = 0
     
     def refresh_screen():
-        # Use ANSI escape codes for efficient screen updates
-        sys.stdout.write("\033[H")  # Move cursor to home position
-        sys.stdout.write("\033[J")  # Clear screen from cursor down
+        clear_screen()
         print(f"{Fore.CYAN}Editing: {filename} {Fore.WHITE}(Ctrl+X to save and exit){Style.RESET_ALL}\n")
-        
         for i, line in enumerate(content):
             if i == cursor_y:
-                # Print line with cursor using a single print
-                sys.stdout.write(line[:cursor_x] + "█" + line[cursor_x:] + "\n")
+                # Print line with cursor
+                print(line[:cursor_x] + "█" + line[cursor_x:])
             else:
-                sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+                print(line)
     
     refresh_screen()
     

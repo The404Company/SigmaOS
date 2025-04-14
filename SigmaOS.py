@@ -104,7 +104,7 @@ def show_help():
     print(f"{Fore.YELLOW}╚{'═' * 24}╝{Style.RESET_ALL}")
 
 def setup_essential_packages():
-    essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper"]
+    essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
     
     print(f"\n{Fore.CYAN}Installing essential packages...{Style.RESET_ALL}")
     print(f"{Fore.WHITE}The following packages will be installed:{Style.RESET_ALL}")
@@ -125,6 +125,12 @@ def setup_essential_packages():
                 print(f"{Fore.YELLOW}Package {pkg} is already installed.{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}Error installing {pkg}: {e}{Style.RESET_ALL}")
+    
+    # Clean up SigmaOS-main folder after all installations
+    sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-main")
+    if os.path.exists(sigmamain_dir):
+        shutil.rmtree(sigmamain_dir)
+        print(f"\n{Fore.GREEN}Cleaned up temporary files{Style.RESET_ALL}")
 
 def get_github_file_content(package_name, filename):
     """Fetch raw file content from GitHub"""
@@ -323,21 +329,14 @@ def get_command_with_history():
     current_input = ""
     cursor_pos = 0
     history_pos = len(COMMAND_HISTORY)
-    
-    def clear_line():
-        # Clear the entire line and move cursor back to start
-        print('\r' + ' ' * (len(current_input) + len("SigmaOS > ") + 1), end='\r')
+    prompt = f"{Fore.GREEN}SigmaOS {Fore.WHITE}> "
     
     def refresh_line(text, cursor):
-        clear_line()
-        prompt = f"{Fore.GREEN}SigmaOS {Fore.WHITE}> "
-        print(f"{prompt}{text}", end='')
-        # Move cursor back if needed
+        # Move to start of line and clear to end
+        print(f"\r\033[K{prompt}{text}", end='', flush=True)
+        # Move cursor to correct position
         if cursor < len(text):
-            # Calculate actual cursor position including color codes
-            total_len = len(text) + len(prompt)
-            move_back = total_len - cursor - len(prompt)
-            print(f"\033[{move_back}D", end='', flush=True)
+            print(f"\033[{len(text) - cursor}D", end='', flush=True)
     
     def get_completions(text):
         parts = text.split()
@@ -359,12 +358,10 @@ def get_command_with_history():
         refresh_line(current_input, cursor_pos)
         key = readchar.readkey()
         
-        if key in (readchar.key.BACKSPACE, '\x7f'):  # Handle both backspace codes
+        if key in (readchar.key.BACKSPACE, '\x7f'):
             if cursor_pos > 0:
-                # Remove character before cursor
                 current_input = current_input[:cursor_pos-1] + current_input[cursor_pos:]
                 cursor_pos -= 1
-                refresh_line(current_input, cursor_pos)
         
         elif key == readchar.key.ENTER:
             print()  # New line after command
