@@ -7,6 +7,7 @@ import json
 import sys
 from zipfile import ZipFile
 from colorama import init, Fore, Back, Style
+import shutil
 
 REPO_URL = "https://github.com/Lominub44/SigmaOS"
 PACKAGES_DIR = "packages"
@@ -133,7 +134,13 @@ def download_package(package_name):
 
         extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-main", package_name)
         if os.path.exists(extracted_folder):
+            if os.path.exists(package_dir):
+                shutil.rmtree(package_dir)
             os.rename(extracted_folder, package_dir)
+            # Clean up SigmaOS-main folder
+            sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-main")
+            if os.path.exists(sigmamain_dir):
+                shutil.rmtree(sigmamain_dir)
             print(f"{Fore.GREEN}Package {package_name} successfully installed.{Style.RESET_ALL}")
         else:
             print(f"{Fore.RED}Package {package_name} not found in downloaded archive.{Style.RESET_ALL}")
