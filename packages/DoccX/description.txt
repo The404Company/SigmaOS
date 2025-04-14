@@ -1,8 +1,0 @@
-[description]
-A simple document viewer for reading files in the documents directory
-
-[author]
-SigmaOS-Team
-
-[requirements]
-colorama

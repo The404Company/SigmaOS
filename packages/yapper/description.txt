@@ -1,9 +1,0 @@
-[description]
-A simple text editor for creating and editing files
-
-[author]
-SigmaOS-Team
-
-[requirements]
-colorama
-msvcrt
