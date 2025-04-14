@@ -1,6 +1,7 @@
 import os
 import subprocess
 import requests
+from zipfile import ZipFile
 
 # Basis-URL des GitHub-Repos, in dem alle Pakete liegen
 REPO_URL = "https://github.com/username/repo"
@@ -19,6 +20,10 @@ def list_packages():
 
 # Funktion zum Installieren eines Pakets (ligma install <paket>)
 def download_package(package_name):
+    # Sicherstellen, dass der Ordner "packages" existiert
+    if not os.path.exists(PACKAGES_DIR):
+        os.makedirs(PACKAGES_DIR)  # Ordner erstellen, falls nicht vorhanden
+
     package_dir = os.path.join(PACKAGES_DIR, package_name)
 
     # Wenn das Paket bereits existiert, überspringen
@@ -26,7 +31,7 @@ def download_package(package_name):
         print(f"Paket {package_name} bereits heruntergeladen.")
         return
 
-    # GitHub Repo URL für das Paket
+    # GitHub Repo URL für das Paket (Verwendung der "zipball"-URL)
     download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
 
     # Das Paket als ZIP herunterladen
@@ -35,10 +40,21 @@ def download_package(package_name):
     response = requests.get(download_url)
 
     if response.status_code == 200:
+        # Speicher die ZIP-Datei lokal
         with open(zip_path, "wb") as f:
             f.write(response.content)
-        subprocess.run(["unzip", zip_path, "-d", PACKAGES_DIR])
+
+        # Entpacke das ZIP-Archiv
+        with ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(PACKAGES_DIR)
+
         os.remove(zip_path)  # ZIP nach dem Entpacken löschen
+
+        # Jetzt kannst du den gewünschten Ordner aus dem Repo entpacken
+        extracted_folder = os.path.join(PACKAGES_DIR, f"repo-main/{package_name}")
+        if os.path.exists(extracted_folder):
+            os.rename(extracted_folder, package_dir)  # Ordner umbenennen, falls notwendig
+
     else:
         print(f"Fehler beim Herunterladen des Pakets {package_name}.")
 
@@ -52,10 +68,6 @@ def run_package(package_name):
 
     print(f"Führe {package_name}/main.py aus...")
     subprocess.run(["python", package_dir])
-
-# Funktion zum Ausführen eines Delta-Kommandos (delta <args>)
-def delta_command(args):
-    print(f"Delta Kommando ausgeführt mit Argumenten: {args}")
 
 # Funktion für die interaktive Kommandozeile von SigmaOS
 def interactive_shell():
