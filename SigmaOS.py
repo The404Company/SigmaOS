@@ -4,6 +4,7 @@ import requests
 import time
 import datetime
 import json
+import sys
 from zipfile import ZipFile
 from colorama import init, Fore, Back, Style
 
@@ -147,7 +148,9 @@ def run_package(package_name):
         return
 
     print(f"{Fore.CYAN}Running {package_name}/main.py...{Style.RESET_ALL}")
-    subprocess.run(["python", package_dir])
+    # Pass any additional arguments after the package name
+    args = [sys.executable, package_dir] + sys.argv[2:]
+    subprocess.run(args)
 
 def is_valid_package(package_name):
     return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
@@ -163,8 +166,16 @@ def interactive_shell():
                 loading_animation("Shutting down SigmaOS")
                 break
 
-            # Check if command is an alias
+            # Split command into parts
             parts = command.split()
+            
+            # Handle package calls with arguments (e.g. "yapper test.txt")
+            if parts and is_valid_package(parts[0]):
+                sys.argv = parts  # Set sys.argv to include command arguments
+                run_package(parts[0])
+                continue
+
+            # Check if command is an alias
             if parts and parts[0] in aliases:
                 command = aliases[parts[0]]
                 if len(parts) > 1:
