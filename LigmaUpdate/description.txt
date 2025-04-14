@@ -1,1 +1,9 @@
+[description]
 Updates installed packages to their latest versions
+
+[author]
+SigmaOS-Team
+
+[requirements]
+colorama
+requests

@@ -1,1 +1,10 @@
+[description]
 Updates the SigmaOS system to the latest version
+
+[author]
+SigmaOS-Team
+
+[requirements]
+colorama
+requests
+psutil

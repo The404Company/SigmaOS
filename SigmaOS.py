@@ -8,10 +8,23 @@ import sys
 from zipfile import ZipFile
 from colorama import init, Fore, Back, Style
 import shutil
+import readchar
 
 REPO_URL = "https://github.com/Lominub44/SigmaOS"
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
+
+COMMAND_HISTORY = []
+MAX_HISTORY = 100
+ALL_COMMANDS = {
+    'help': [],
+    'exit': [],
+    'clear': [],
+    'setup': [],
+    'ligma': ['list', 'install'],
+    'alias': ['list', 'add', 'remove'],
+    'sigma': ['help', 'quit']
+}
 
 init(autoreset=True)  # Initialize colorama
 
@@ -113,19 +126,61 @@ def setup_essential_packages():
         except Exception as e:
             print(f"{Fore.RED}Error installing {pkg}: {e}{Style.RESET_ALL}")
 
-def get_package_description(package_name):
-    """Get package description from description.txt file"""
-    if not is_valid_package(package_name):
-        return "No description available"
-        
-    desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
+def get_github_file_content(package_name, filename):
+    """Fetch raw file content from GitHub"""
+    url = f"https://raw.githubusercontent.com/Lominub44/SigmaOS/main/{package_name}/{filename}"
     try:
-        if os.path.exists(desc_file):
-            with open(desc_file, 'r', encoding='utf-8') as f:
-                return f.read().strip()
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.text.strip()
     except:
         pass
-    return "No description available"
+    return None
+
+def parse_description_file(content):
+    """Parse the sections from a description.txt file"""
+    sections = {
+        'description': 'No description available',
+        'author': 'Unknown',
+        'requirements': []
+    }
+    
+    current_section = None
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+            
+        if line.startswith('[') and line.endswith(']'):
+            current_section = line[1:-1].lower()
+            continue
+            
+        if current_section:
+            if current_section == 'requirements':
+                if line:
+                    sections[current_section].append(line)
+            else:
+                sections[current_section] = line
+                
+    return sections
+
+def get_package_description(package_name, installed=True):
+    """Get package description from local file or GitHub"""
+    if installed and is_valid_package(package_name):
+        desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
+        try:
+            if os.path.exists(desc_file):
+                with open(desc_file, 'r', encoding='utf-8') as f:
+                    return parse_description_file(f.read())
+        except:
+            pass
+    else:
+        # Try to fetch from GitHub for non-installed packages
+        content = get_github_file_content(package_name, "description.txt")
+        if content:
+            return parse_description_file(content)
+    
+    return {'description': 'No description available', 'author': 'Unknown', 'requirements': []}
 
 def list_packages():
     # Get installed packages first
@@ -154,7 +209,10 @@ def list_packages():
             print(f"\n{Fore.GREEN}Installed:{Style.RESET_ALL}")
             for pkg in installed_packages:
                 desc = get_package_description(pkg)
-                print(f"{Fore.GREEN}  ✓ {pkg:<15}{Fore.WHITE} - {desc}")
+                print(f"{Fore.GREEN}  ✓ {pkg:<15}{Fore.WHITE} - {desc['description']}")
+                print(f"{Fore.CYAN}    Author: {desc['author']}")
+                if desc['requirements']:
+                    print(f"{Fore.YELLOW}    Requires: {', '.join(desc['requirements'])}")
                 packages_found = True
         
         # Show available but not installed packages
@@ -162,8 +220,11 @@ def list_packages():
         if not_installed:
             print(f"\n{Fore.YELLOW}Not Installed:{Style.RESET_ALL}")
             for pkg in not_installed:
-                # For non-installed packages, we can't read the description yet
-                print(f"{Fore.WHITE}  ▶ {pkg:<15}")
+                desc = get_package_description(pkg, installed=False)
+                print(f"{Fore.WHITE}  ▶ {pkg:<15} - {desc['description']}")
+                print(f"{Fore.CYAN}    Author: {desc['author']}")
+                if desc['requirements']:
+                    print(f"{Fore.YELLOW}    Requires: {', '.join(desc['requirements'])}")
                 packages_found = True
         
         if not packages_found:
@@ -202,6 +263,17 @@ def download_package(package_name):
             if os.path.exists(package_dir):
                 shutil.rmtree(package_dir)
             os.rename(extracted_folder, package_dir)
+            
+            # Install package requirements
+            desc = get_package_description(package_name)
+            if desc['requirements']:
+                print(f"\n{Fore.CYAN}Installing dependencies...{Style.RESET_ALL}")
+                for req in desc['requirements']:
+                    loading_animation(f"Installing {req}")
+                    subprocess.run([sys.executable, "-m", "pip", "install", req], 
+                                 stdout=subprocess.DEVNULL, 
+                                 stderr=subprocess.DEVNULL)
+            
             # Clean up SigmaOS-main folder
             sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-main")
             if os.path.exists(sigmamain_dir):
@@ -246,13 +318,111 @@ def suggest_command(command):
     if matches:
         print(f"{Fore.YELLOW}Did you mean: {Fore.GREEN}{matches[0]}{Fore.YELLOW}?{Style.RESET_ALL}")
 
+def get_command_with_history():
+    """Handle input with command history and tab completion"""
+    current_input = ""
+    cursor_pos = 0
+    history_pos = len(COMMAND_HISTORY)
+    
+    def clear_line():
+        # Clear the entire line and move cursor back to start
+        print('\r' + ' ' * (len(current_input) + len("SigmaOS > ") + 1), end='\r')
+    
+    def refresh_line(text, cursor):
+        clear_line()
+        prompt = f"{Fore.GREEN}SigmaOS {Fore.WHITE}> "
+        print(f"{prompt}{text}", end='')
+        # Move cursor back if needed
+        if cursor < len(text):
+            # Calculate actual cursor position including color codes
+            total_len = len(text) + len(prompt)
+            move_back = total_len - cursor - len(prompt)
+            print(f"\033[{move_back}D", end='', flush=True)
+    
+    def get_completions(text):
+        parts = text.split()
+        if not text or text[-1] == ' ':
+            # New word, show all possible commands
+            return [cmd for cmd in ALL_COMMANDS.keys() if not parts or cmd.startswith(parts[0])]
+        
+        if len(parts) == 1:
+            # Complete first word (command)
+            return [cmd for cmd in ALL_COMMANDS.keys() if cmd.startswith(parts[0])]
+        elif len(parts) >= 2:
+            # Complete subcommands if available
+            cmd = parts[0]
+            if cmd in ALL_COMMANDS:
+                return [sub for sub in ALL_COMMANDS[cmd] if sub.startswith(parts[-1])]
+        return []
+
+    while True:
+        refresh_line(current_input, cursor_pos)
+        key = readchar.readkey()
+        
+        if key in (readchar.key.BACKSPACE, '\x7f'):  # Handle both backspace codes
+            if cursor_pos > 0:
+                # Remove character before cursor
+                current_input = current_input[:cursor_pos-1] + current_input[cursor_pos:]
+                cursor_pos -= 1
+                refresh_line(current_input, cursor_pos)
+        
+        elif key == readchar.key.ENTER:
+            print()  # New line after command
+            if current_input.strip():
+                COMMAND_HISTORY.append(current_input)
+                if len(COMMAND_HISTORY) > MAX_HISTORY:
+                    COMMAND_HISTORY.pop(0)
+            return current_input
+        
+        elif key == readchar.key.TAB:
+            completions = get_completions(current_input)
+            if len(completions) == 1:
+                # Single completion - use it
+                if not current_input or current_input[-1] == ' ':
+                    current_input += completions[0]
+                else:
+                    parts = current_input.split()
+                    parts[-1] = completions[0]
+                    current_input = ' '.join(parts)
+                cursor_pos = len(current_input)
+            elif len(completions) > 1:
+                # Show multiple completions
+                print()
+                for comp in completions:
+                    print(f"{Fore.CYAN}  {comp}{Style.RESET_ALL}")
+                print()
+        
+        elif key == readchar.key.UP:
+            if history_pos > 0:
+                history_pos -= 1
+                current_input = COMMAND_HISTORY[history_pos]
+                cursor_pos = len(current_input)
+        
+        elif key == readchar.key.DOWN:
+            if history_pos < len(COMMAND_HISTORY):
+                history_pos += 1
+                current_input = COMMAND_HISTORY[history_pos] if history_pos < len(COMMAND_HISTORY) else ""
+                cursor_pos = len(current_input)
+        
+        elif key == readchar.key.LEFT:
+            if cursor_pos > 0:
+                cursor_pos -= 1
+        
+        elif key == readchar.key.RIGHT:
+            if cursor_pos < len(current_input):
+                cursor_pos += 1
+        
+        elif len(key) == 1 and key.isprintable():
+            current_input = current_input[:cursor_pos] + key + current_input[cursor_pos:]
+            cursor_pos += 1
+
 def interactive_shell():
     show_banner()
     show_welcome_message()  # Show welcome message for new users
     aliases = load_aliases()
     while True:
         try:
-            command = input(f"{Fore.GREEN}SigmaOS {Fore.WHITE}> ")
+            command = get_command_with_history()  # Replace input() with our new function
 
             if command.lower() in ["exit", "sigma quit"]:
                 loading_animation("Shutting down SigmaOS")
