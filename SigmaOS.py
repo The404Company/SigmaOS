@@ -20,7 +20,7 @@ def show_banner():
     clear_screen()
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"{Fore.CYAN}╔══════════════════════════════════════╗")
-    print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS v1.1 {Fore.WHITE}⌚ {current_time}{Fore.CYAN} ║")
+    print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS v0.1 {Fore.WHITE}⌚ {current_time}{Fore.CYAN} ║")
     print(f"╚══════════════════════════════════════╝{Style.RESET_ALL}")
 
 def loading_animation(message, duration=2):
