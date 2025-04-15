@@ -14,29 +14,52 @@ def clear_screen():
 def show_banner():
     clear_screen()
     print(f"{Fore.CYAN}╔═══ OmegaNet Tools ═══╗")
-    print(f"║ 1. Ping Tool          ║")
-    print(f"║ 2. Port Scanner       ║")
-    print(f"║ 3. DNS Lookup         ║")
-    print(f"║ 4. Speed Test         ║")
-    print(f"║ 5. Device Discovery   ║")
+    print(f"║ 1. Ping Tool         ║")
+    print(f"║ 2. Port Scanner      ║")
+    print(f"║ 3. DNS Lookup        ║")
+    print(f"║ 4. Speed Test        ║")
+    print(f"║ 5. Device Discovery  ║")
     print(f"║ 0. Exit              ║")
-    print(f"╚════════════════════════╝{Style.RESET_ALL}")
+    print(f"╚══════════════════════╝{Style.RESET_ALL}")
 
 def ping_host():
     host = input(f"\n{Fore.WHITE}Enter hostname/IP to ping: {Style.RESET_ALL}")
     count = 4
     print(f"\n{Fore.CYAN}Pinging {host}...{Style.RESET_ALL}")
     
+    # Platform specific ping command
+    if os.name == 'nt':  # Windows
+        ping_cmd = ['ping', '-n', '1', host]
+    else:  # Linux/Mac
+        ping_cmd = ['ping', '-c', '1', host]
+    
     for i in range(count):
         try:
-            output = subprocess.run(['ping', '-n', '1', host], 
-                                  capture_output=True, text=True)
-            if "TTL=" in output.stdout:
-                print(f"{Fore.GREEN}Reply from {host}: time={output.stdout.split('time=')[1].split('ms')[0]}ms{Style.RESET_ALL}")
+            # Run ping with universal encoding handling
+            output = subprocess.run(
+                ping_cmd,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            # Parse ping response based on platform
+            if os.name == 'nt':
+                if "bytes=" in output.stdout:
+                    time_ms = output.stdout.split("time=")[1].split("ms")[0].strip()
+                    print(f"{Fore.GREEN}Reply from {host}: time={time_ms}ms{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.RED}Request timed out{Style.RESET_ALL}")
             else:
-                print(f"{Fore.RED}Request timed out{Style.RESET_ALL}")
-        except:
-            print(f"{Fore.RED}Error pinging host{Style.RESET_ALL}")
+                if " time=" in output.stdout:
+                    time_ms = output.stdout.split("time=")[1].split(" ")[0].strip()
+                    print(f"{Fore.GREEN}Reply from {host}: time={time_ms}ms{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.RED}Request timed out{Style.RESET_ALL}")
+                    
+        except Exception as e:
+            print(f"{Fore.RED}Error pinging host: {str(e)}{Style.RESET_ALL}")
         time.sleep(1)
 
 def scan_ports():
