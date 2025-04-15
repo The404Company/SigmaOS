@@ -1,0 +1,12 @@
+[description]
+Network diagnostics and scanning tools for SigmaOS
+
+[author]
+SigmaOS-Team
+
+[requirements]
+colorama
+requests
+dnspython
+scapy
+speedtest-cli

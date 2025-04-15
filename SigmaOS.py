@@ -86,22 +86,51 @@ def list_aliases():
         print(f"{Fore.YELLOW}No aliases configured.{Style.RESET_ALL}")
 
 def show_help():
-    print(f"\n{Fore.YELLOW}╔══ SigmaOS Commands ══╗{Style.RESET_ALL}")
-    commands = [
+    print(f"\n{Fore.YELLOW}╔══ SigmaOS Help ══════════════════════════╗{Style.RESET_ALL}")
+    
+    # System Commands
+    print(f"\n{Fore.CYAN}System Commands:{Style.RESET_ALL}")
+    system_commands = [
         ("help", "Show this help message"),
-        ("exit", "Exit SigmaOS"),
+        ("exit, sigma quit", "Exit SigmaOS"),
         ("clear", "Clear the screen"),
-        ("setup", "Install essential packages"),
+        ("setup", "Install essential packages")
+    ]
+    for cmd, desc in system_commands:
+        print(f"{Fore.GREEN}  {cmd:<25}{Fore.WHITE} - {desc}")
+
+    # Package Management
+    print(f"\n{Fore.CYAN}Package Management:{Style.RESET_ALL}")
+    pkg_commands = [
         ("ligma list", "List available packages"),
         ("ligma install <pkg>", "Install a package"),
-        ("alias list", "List all aliases"),
-        ("alias add <name> <cmd>", "Add new alias"),
-        ("alias remove <name>", "Remove alias"),
         ("<package>", "Run a package directly")
     ]
-    for cmd, desc in commands:
-        print(f"{Fore.CYAN}  {cmd:<20}{Fore.WHITE} - {desc}")
-    print(f"{Fore.YELLOW}╚{'═' * 24}╝{Style.RESET_ALL}")
+    for cmd, desc in pkg_commands:
+        print(f"{Fore.GREEN}  {cmd:<25}{Fore.WHITE} - {desc}")
+
+    # Alias Management
+    print(f"\n{Fore.CYAN}Alias Management:{Style.RESET_ALL}")
+    alias_commands = [
+        ("alias list", "List all aliases"),
+        ("alias add <name> <cmd>", "Add new alias"),
+        ("alias remove <name>", "Remove alias")
+    ]
+    for cmd, desc in alias_commands:
+        print(f"{Fore.GREEN}  {cmd:<25}{Fore.WHITE} - {desc}")
+
+    # Keyboard Shortcuts
+    print(f"\n{Fore.CYAN}Keyboard Shortcuts:{Style.RESET_ALL}")
+    shortcuts = [
+        ("Tab", "Auto-complete commands"),
+        ("Up/Down", "Navigate command history"),
+        ("Left/Right", "Move cursor"),
+        ("Ctrl+C", "Interrupt current operation")
+    ]
+    for key, desc in shortcuts:
+        print(f"{Fore.YELLOW}  {key:<25}{Fore.WHITE} - {desc}")
+
+    print(f"\n{Fore.YELLOW}╚{'═' * 41}╝{Style.RESET_ALL}")
 
 def setup_essential_packages():
     essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
@@ -316,13 +345,38 @@ def show_welcome_message():
         print(f"{Fore.GREEN}  ligma list{Fore.WHITE} - Show available packages\n")
 
 def suggest_command(command):
-    """Suggest similar commands when user makes a typo"""
+    """Enhanced command suggestions with inline display"""
     from difflib import get_close_matches
-    all_commands = ["help", "exit", "clear", "setup", "ligma list", "ligma install",
-                   "alias list", "alias add", "alias remove", "sigma help", "sigma quit"]
-    matches = get_close_matches(command, all_commands, n=1, cutoff=0.6)
+    
+    # Expanded command list with descriptions
+    command_suggestions = {
+        "help": "Show help menu",
+        "exit": "Exit SigmaOS",
+        "clear": "Clear screen",
+        "setup": "Install essential packages",
+        "ligma list": "List available packages",
+        "ligma install": "Install a package",
+        "alias list": "List all aliases",
+        "alias add": "Add new alias",
+        "alias remove": "Remove existing alias",
+        "sigma help": "Show help menu",
+        "sigma quit": "Exit SigmaOS"
+    }
+
+    # Get close matches for the command
+    matches = get_close_matches(command, command_suggestions.keys(), n=3, cutoff=0.5)
+    
     if matches:
-        print(f"{Fore.YELLOW}Did you mean: {Fore.GREEN}{matches[0]}{Fore.YELLOW}?{Style.RESET_ALL}")
+        print(f"\n{Fore.YELLOW}Suggestions:{Style.RESET_ALL}")
+        for match in matches:
+            # Calculate similarity score (simplified)
+            similarity = sum(a == b for a, b in zip(command, match)) / max(len(command), len(match))
+            similarity_bar = "█" * int(similarity * 10)
+            print(f"{Fore.CYAN}  {match:<20} {Fore.WHITE}- {command_suggestions[match]}")
+            print(f"{Fore.BLUE}  Relevance: {similarity_bar:<10} {int(similarity * 100)}%")
+    
+        # Show quick-use hint for the best match
+        print(f"\n{Fore.WHITE}Type {Fore.GREEN}{matches[0]}{Fore.WHITE} or press {Fore.YELLOW}Tab{Fore.WHITE} to use the top suggestion{Style.RESET_ALL}")
 
 def get_command_with_history():
     """Handle input with command history and tab completion"""
@@ -339,20 +393,33 @@ def get_command_with_history():
             print(f"\033[{len(text) - cursor}D", end='', flush=True)
     
     def get_completions(text):
+        """Enhanced command completion with package names"""
         parts = text.split()
-        if not text or text[-1] == ' ':
-            # New word, show all possible commands
-            return [cmd for cmd in ALL_COMMANDS.keys() if not parts or cmd.startswith(parts[0])]
+        completions = []
         
-        if len(parts) == 1:
-            # Complete first word (command)
-            return [cmd for cmd in ALL_COMMANDS.keys() if cmd.startswith(parts[0])]
+        if not text or text[-1] == ' ':
+            # Show all commands and installed packages
+            completions.extend(ALL_COMMANDS.keys())
+            # Add installed packages to suggestions
+            if os.path.exists(PACKAGES_DIR):
+                completions.extend([d for d in os.listdir(PACKAGES_DIR) 
+                                  if os.path.isdir(os.path.join(PACKAGES_DIR, d))])
+        elif len(parts) == 1:
+            # Complete first word (commands or packages)
+            base = parts[0]
+            completions.extend([cmd for cmd in ALL_COMMANDS.keys() if cmd.startswith(base)])
+            if os.path.exists(PACKAGES_DIR):
+                completions.extend([d for d in os.listdir(PACKAGES_DIR) 
+                                  if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                                  and d.startswith(base)])
         elif len(parts) >= 2:
             # Complete subcommands if available
             cmd = parts[0]
             if cmd in ALL_COMMANDS:
-                return [sub for sub in ALL_COMMANDS[cmd] if sub.startswith(parts[-1])]
-        return []
+                completions.extend([sub for sub in ALL_COMMANDS[cmd] 
+                                  if sub.startswith(parts[-1])])
+        
+        return sorted(set(completions))  # Remove duplicates and sort
 
     while True:
         refresh_line(current_input, cursor_pos)
