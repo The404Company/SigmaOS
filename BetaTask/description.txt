@@ -1,0 +1,10 @@
+[description]
+Interactive process manager with resource monitoring
+
+[author]
+SigmaOS-Team
+
+[requirements]
+colorama
+psutil
+windows-curses
