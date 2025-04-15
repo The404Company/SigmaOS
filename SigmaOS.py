@@ -270,7 +270,9 @@ def list_packages():
         # Show installed packages first
         if installed_packages:
             print(f"\n{Fore.GREEN}Installed:{Style.RESET_ALL}")
-            for pkg in installed_packages:
+            for i, pkg in enumerate(installed_packages):
+                if i > 0:  # Add empty line before each package except the first one
+                    print()
                 desc = get_package_description(pkg)
                 print(f"{Fore.GREEN}{pkg} {Fore.WHITE}- {desc['description']}")
                 print(f"{Fore.CYAN}{desc['author']} {Fore.WHITE}- v{desc['version']}")
@@ -280,7 +282,9 @@ def list_packages():
         not_installed = [pkg for pkg in available_packages if pkg not in installed_packages]
         if not_installed:
             print(f"\n{Fore.YELLOW}Not Installed:{Style.RESET_ALL}")
-            for pkg in not_installed:
+            for i, pkg in enumerate(not_installed):
+                if i > 0:  # Add empty line before each package except the first one
+                    print()
                 desc = get_package_description(pkg, installed=False)
                 print(f"{Fore.WHITE}{pkg} - {desc['description']}")
                 print(f"{Fore.CYAN}{desc['author']} - v{desc['version']}")
