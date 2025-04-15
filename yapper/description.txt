@@ -4,6 +4,9 @@ A simple text editor for creating and editing files
 [author]
 SigmaOS-Team
 
+[version]
+1.0
+
 [requirements]
 colorama
 msvcrt

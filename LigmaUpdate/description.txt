@@ -4,6 +4,9 @@ Updates installed packages to their latest versions
 [author]
 SigmaOS-Team
 
+[version]
+1.0
+
 [requirements]
 colorama
 requests

@@ -21,6 +21,7 @@ ALL_COMMANDS = {
     'exit': [],
     'clear': [],
     'setup': [],
+    'reset': [],
     'ligma': ['list', 'install'],
     'alias': ['list', 'add', 'remove'],
     'sigma': ['help', 'quit']
@@ -94,7 +95,8 @@ def show_help():
         ("help", "Show this help message"),
         ("exit, sigma quit", "Exit SigmaOS"),
         ("clear", "Clear the screen"),
-        ("setup", "Install essential packages")
+        ("setup", "Install essential packages"),
+        ("reset", "Reset SigmaOS to default state")
     ]
     for cmd, desc in system_commands:
         print(f"{Fore.GREEN}  {cmd:<25}{Fore.WHITE} - {desc}")
@@ -161,6 +163,31 @@ def setup_essential_packages():
         shutil.rmtree(sigmamain_dir)
         print(f"\n{Fore.GREEN}Cleaned up temporary files{Style.RESET_ALL}")
 
+def reset_sigmaos():
+    """Reset SigmaOS by removing documents, packages and pycache folders"""
+    folders_to_delete = [
+        os.path.join(os.path.dirname(__file__), "documents"),
+        os.path.join(os.path.dirname(__file__), "packages"),
+        os.path.join(os.path.dirname(__file__), "__pycache__")
+    ]
+    
+    print(f"\n{Fore.YELLOW}Warning: This will delete all installed packages and documents!{Style.RESET_ALL}")
+    confirm = input(f"{Fore.RED}Are you sure you want to reset SigmaOS? (y/N): {Style.RESET_ALL}")
+    
+    if confirm.lower() != 'y':
+        print(f"{Fore.GREEN}Reset cancelled.{Style.RESET_ALL}")
+        return
+        
+    for folder in folders_to_delete:
+        if os.path.exists(folder):
+            try:
+                shutil.rmtree(folder)
+                loading_animation(f"Removed {os.path.basename(folder)}")
+            except Exception as e:
+                print(f"{Fore.RED}Error removing {folder}: {e}{Style.RESET_ALL}")
+    
+    print(f"\n{Fore.GREEN}SigmaOS has been reset to default state.{Style.RESET_ALL}")
+
 def get_github_file_content(package_name, filename):
     """Fetch raw file content from GitHub"""
     url = f"https://raw.githubusercontent.com/Lominub44/SigmaOS/main/{package_name}/{filename}"
@@ -177,6 +204,7 @@ def parse_description_file(content):
     sections = {
         'description': 'No description available',
         'author': 'Unknown',
+        'version': '0.0',
         'requirements': []
     }
     
@@ -215,7 +243,7 @@ def get_package_description(package_name, installed=True):
         if content:
             return parse_description_file(content)
     
-    return {'description': 'No description available', 'author': 'Unknown', 'requirements': []}
+    return {'description': 'No description available', 'author': 'Unknown', 'version': '0.0', 'requirements': []}
 
 def list_packages():
     # Get installed packages first
@@ -244,10 +272,8 @@ def list_packages():
             print(f"\n{Fore.GREEN}Installed:{Style.RESET_ALL}")
             for pkg in installed_packages:
                 desc = get_package_description(pkg)
-                print(f"{Fore.GREEN}  ✓ {pkg:<15}{Fore.WHITE} - {desc['description']}")
-                print(f"{Fore.CYAN}    Author: {desc['author']}")
-                if desc['requirements']:
-                    print(f"{Fore.YELLOW}    Requires: {', '.join(desc['requirements'])}")
+                print(f"{Fore.GREEN}{pkg} {Fore.WHITE}- {desc['description']}")
+                print(f"{Fore.CYAN}{desc['author']} {Fore.WHITE}- v{desc['version']}")
                 packages_found = True
         
         # Show available but not installed packages
@@ -256,10 +282,8 @@ def list_packages():
             print(f"\n{Fore.YELLOW}Not Installed:{Style.RESET_ALL}")
             for pkg in not_installed:
                 desc = get_package_description(pkg, installed=False)
-                print(f"{Fore.WHITE}  ▶ {pkg:<15} - {desc['description']}")
-                print(f"{Fore.CYAN}    Author: {desc['author']}")
-                if desc['requirements']:
-                    print(f"{Fore.YELLOW}    Requires: {', '.join(desc['requirements'])}")
+                print(f"{Fore.WHITE}{pkg} - {desc['description']}")
+                print(f"{Fore.CYAN}{desc['author']} - v{desc['version']}")
                 packages_found = True
         
         if not packages_found:
@@ -354,6 +378,7 @@ def suggest_command(command):
         "exit": "Exit SigmaOS",
         "clear": "Clear screen",
         "setup": "Install essential packages",
+        "reset": "Reset SigmaOS to default state",
         "ligma list": "List available packages",
         "ligma install": "Install a package",
         "alias list": "List all aliases",
@@ -533,6 +558,10 @@ def interactive_shell():
             
             elif main_command == "setup":
                 setup_essential_packages()
+            
+            elif main_command == "reset":
+                reset_sigmaos()
+                show_banner()
             
             elif main_command == "ligma":
                 if args:

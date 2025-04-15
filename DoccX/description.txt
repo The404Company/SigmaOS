@@ -4,5 +4,8 @@ A simple document viewer for reading files in the documents directory
 [author]
 SigmaOS-Team
 
+[version]
+1.0
+
 [requirements]
 colorama

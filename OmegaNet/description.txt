@@ -4,6 +4,9 @@ Network diagnostics and scanning tools for SigmaOS
 [author]
 SigmaOS-Team
 
+[version]
+1.0
+
 [requirements]
 colorama
 requests

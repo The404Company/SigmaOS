@@ -4,6 +4,9 @@ System resource monitor and task manager for viewing and managing system process
 [author]
 SigmaOS-Team
 
+[version]
+1.0
+
 [requirements]
 colorama
 psutil
