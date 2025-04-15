@@ -1,5 +1,5 @@
 [description]
-Interactive process manager with resource monitoring
+System resource monitor and task manager for viewing and managing system processes
 
 [author]
 SigmaOS-Team
@@ -7,4 +7,3 @@ SigmaOS-Team
 [requirements]
 colorama
 psutil
-windows-curses
