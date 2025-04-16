@@ -1,0 +1,13 @@
+[description]
+A simple Ai ChatBot
+
+[author]
+SigmaOS-Team
+
+[version]
+1.0
+
+[requirements]
+Requests
+Colorama
+llama_cpp
