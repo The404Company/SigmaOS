@@ -22,7 +22,7 @@ ALL_COMMANDS = {
     'clear': [],
     'setup': [],
     'reset': [],
-    'ligma': ['list', 'install'],
+    'ligma': ['list', 'install', 'uninstall'],  # Added uninstall
     'alias': ['list', 'add', 'remove'],
     'sigma': ['help', 'quit']
 }
@@ -106,6 +106,7 @@ def show_help():
     pkg_commands = [
         ("ligma list", "List available packages"),
         ("ligma install <pkg>", "Install a package"),
+        ("ligma uninstall <pkg>", "Uninstall a package"),
         ("<package>", "Run a package directly")
     ]
     for cmd, desc in pkg_commands:
@@ -347,6 +348,23 @@ def download_package(package_name):
     else:
         print(f"{Fore.RED}Error downloading package {package_name}.{Style.RESET_ALL}")
 
+def uninstall_package(package_name):
+    """Uninstall a package by removing its directory"""
+    package_dir = os.path.join(PACKAGES_DIR, package_name)
+    
+    if not os.path.exists(package_dir):
+        print(f"{Fore.RED}Package {package_name} is not installed.{Style.RESET_ALL}")
+        return False
+        
+    try:
+        print(f"{Fore.YELLOW}Uninstalling {package_name}...{Style.RESET_ALL}")
+        shutil.rmtree(package_dir)
+        loading_animation(f"Removed {package_name}")
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}Error uninstalling {package_name}: {e}{Style.RESET_ALL}")
+        return False
+
 def run_package(package_name):
     package_dir = os.path.join(PACKAGES_DIR, package_name, "main.py")
 
@@ -385,6 +403,7 @@ def suggest_command(command):
         "reset": "Reset SigmaOS to default state",
         "ligma list": "List available packages",
         "ligma install": "Install a package",
+        "ligma uninstall": "Uninstall a package",
         "alias list": "List all aliases",
         "alias add": "Add new alias",
         "alias remove": "Remove existing alias",
@@ -574,10 +593,12 @@ def interactive_shell():
                         list_packages()
                     elif subcommand == "install" and len(args) == 2:
                         download_package(args[1])
+                    elif subcommand == "uninstall" and len(args) == 2:
+                        uninstall_package(args[1])
                     else:
                         print(f"{Fore.RED}Unknown command for ligma.{Style.RESET_ALL}")
                 else:
-                    print(f"{Fore.YELLOW}Usage: ligma: list | install <package>{Style.RESET_ALL}")
+                    print(f"{Fore.YELLOW}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
             
             elif main_command == "delta":
                 delta_command(args)

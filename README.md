@@ -1,5 +1,7 @@
 # SigmaOS
  A verry (usefull) fake-subsystem
 
-## WIP!!!
-- nothing actually works at the moment
+## coming features:
+- external sources for ligma
+- music-player package
+- local AI assistant
