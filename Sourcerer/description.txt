@@ -1,5 +1,5 @@
 [description]
-A simple Ai ChatBot
+Install packages from external Sources
 
 [author]
 SigmaOS-Team
@@ -8,6 +8,5 @@ SigmaOS-Team
 1.0
 
 [requirements]
-Requests
-Colorama
-llama_cpp_python
+zipfile
+colorama
