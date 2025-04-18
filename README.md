@@ -80,3 +80,14 @@ You only need to download the `SigmaOS.py` file. The system will automatically:
 - Handle updates through packages
 
 All packages and additional features will be downloaded and installed through the built-in package manager when needed.
+
+## Coming Soon
+
+### Planned Features
+- SSH client for remote system management
+- Custom theme support and color schemes
+- Command history search with fuzzy matching
+
+### Upcoming Packages
+- **RhoSecure** - Password manager with encription
+- **PhiMail**   - Command-line email client
