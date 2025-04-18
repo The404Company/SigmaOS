@@ -10,8 +10,8 @@ A lightweight and modular command-line interface system with package management 
 ## System Commands
 
 ### Basic Operations
-- `help` - Display help information
-- `exit` or `sigma quit` - Exit SigmaOS
+- `help`  - Display help information
+- `exit`  - Exit SigmaOS
 - `clear` - Clear the terminal screen
 - `setup` - Install essential packages
 - `reset` - Restore SigmaOS to its default settings
