@@ -1,6 +1,7 @@
 import os, sys, json, requests, shutil, subprocess
 from zipfile import ZipFile
 from colorama import Fore, Style
+import re
 
 PACKAGES_DIR = "packages"
 SOURCES_FILE = "sources.json"
@@ -18,11 +19,26 @@ def get_sources():
     with open(SOURCES_FILE, 'r') as f:
         return json.load(f)
 
+def print_sources():
+    sources = get_sources()
+    if not sources:
+        print(f"{Fore.YELLOW}No sources added yet.{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.CYAN}Registered sources:{Style.RESET_ALL}")
+        for i, src in enumerate(sources, 1):
+            print(f"  {Fore.GREEN}{i}.{Style.RESET_ALL} {src}")
+
+
 def save_sources(sources):
     with open(SOURCES_FILE, 'w') as f:
         json.dump(sources, f, indent=2)
 
 def add_source(source):
+    # Check if the source matches the pattern "user/repo"
+    if not re.match(r"^[\w\-]+/[\w\-]+$", source):
+        print(f"{Fore.RED}Invalid source format. Use 'username/repo'.{Style.RESET_ALL}")
+        return
+
     sources = get_sources()
     if source not in sources:
         sources.append(source)
@@ -158,11 +174,22 @@ def main_loop():
         elif cmd.startswith("install "):
             install_package(cmd.split(" ", 1)[1])
         elif cmd == "sources":
-            print(get_sources())
+            print_sources()
+        elif cmd == "verified":
+            print(f"""{Fore.GREEN}Verified sources:{Style.RESET_ALL}
+    - Lominub44/SigmaOS_pkg_test""")
         elif cmd == "help":
-            print("Commands: add <src>, remove <src>, list, install <pkg>, sources, exit")
+            print(f"""{Fore.GREEN}Commands:{Style.RESET_ALL}
+    - add <src>: Add a GitHub source (e.g., user/repo)
+    - remove <src>: Remove a GitHub source
+    - list: List all packages from sources
+    - install <pkg>: Install a package
+    - sources: Show all sources
+    - verified: Show verified sources
+    - help: Show this help message
+    - exit: Exit the program""")
         else:
-            print("Unknown command. Type 'help'.")
+            print(f"{Fore.RED}Unknown command. Type 'help'{Style.RESET_ALL}")
 
 if __name__ == "__main__":
     main_loop()
