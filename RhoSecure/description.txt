@@ -1,0 +1,12 @@
+[description]
+Secure password manager with encryption
+
+[author]
+SigmaOS-Team
+
+[version]
+1.0
+
+[requirements]
+cryptography
+colorama

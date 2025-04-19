@@ -38,6 +38,7 @@ A lightweight and modular command-line interface system with package management 
 ### System Utilities
 - **BetaTask** - System resource monitor and task manager
 - **OmegaNet** - Network diagnostics suite with ping, port scanning, and DNS tools
+- **RhoSecure** - Secure password manager with encryption
 - **Sourcerer** - Package installer for external sources
 - **XiAI** - Intelligent assistant designed for SigmaOS
 
@@ -75,14 +76,16 @@ betatask                 # Run BetaTask
 - Command history search with fuzzy matching
 
 ### Upcoming Packages
-- **RhoSecure** - Password manager with encription
 - **PhiMail**   - Command-line email client
 
+---
 
 ## System Requirements
 - Python 3.x
 - Internet connection for package installation
 - Linux or Windows operating system
+
+---
 
 ## Note
 You only need to download the `SigmaOS.py` file. The system will automatically:
