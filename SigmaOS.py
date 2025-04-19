@@ -13,6 +13,7 @@ import readchar
 REPO_URL = "https://github.com/Lominub44/SigmaOS"
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
+VERSION = "0.1.0"
 
 COMMAND_HISTORY = []
 MAX_HISTORY = 100
@@ -35,9 +36,9 @@ def clear_screen():
 def show_banner():
     clear_screen()
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"{Fore.CYAN}╔══════════════════════════════════════╗")
-    print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS v0.1 {Fore.WHITE}⌚ {current_time}{Fore.CYAN} ║")
-    print(f"╚══════════════════════════════════════╝{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}╔═════════════════════════╗")
+    print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS {Fore.GREEN}v{VERSION}{Fore.WHITE}        ║")
+    print(f"╚═════════════════════════╝{Style.RESET_ALL}")
 
 def loading_animation(message, duration=2):
     frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
