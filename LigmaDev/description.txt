@@ -1,13 +1,11 @@
 [description]
-A simple AI ChatBot
+Developer tools for creating SigmaOS packages
 
 [author]
 SigmaOS-Team
 
 [version]
-0.1
+1.0
 
 [requirements]
-requests
 colorama
-llama_cpp_python

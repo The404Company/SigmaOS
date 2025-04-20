@@ -74,9 +74,11 @@ betatask                 # Run BetaTask
 - SSH client for remote system management
 - Custom theme support and color schemes
 - Command history search with fuzzy matching
+- GUI-packages (2025/2026)
+Those features might come as packages or built-in.
 
 ### Upcoming Packages
-- **PhiMail**   - Command-line email client
+- None at the moment. Share your idea in the [official Discord](https://discord.gg/KxUfgTszjN)
 
 ---
 
