@@ -1,14 +1,33 @@
-import os
 import subprocess
+import sys
+import os
+
+def ensure_base_libraries():
+    # Install essential libraries needed for the splash screen
+    base_requirements = ['colorama', 'psutil', 'gputil', 'requests', 'readchar']
+    for lib in base_requirements:
+        try:
+            __import__(lib)
+        except ImportError:
+            print(f"Installing required library: {lib}")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
+
+# Install base requirements first
+ensure_base_libraries()
+
+# Now we can safely import these
 import requests
 import time
 import datetime
 import json
-import sys
 from zipfile import ZipFile
 from colorama import init, Fore, Back, Style
 import shutil
 import readchar
+import psutil
+import GPUtil
+import platform
+import math
 
 REPO_URL = "https://github.com/Lominub44/SigmaOS"
 PACKAGES_DIR = "packages"
@@ -529,7 +548,114 @@ def get_command_with_history():
             current_input = current_input[:cursor_pos] + key + current_input[cursor_pos:]
             cursor_pos += 1
 
+def show_splash_screen():
+    """Display a splash screen and ensure all dependencies are installed"""
+    # List of all required libraries
+    required_libraries = {
+        'requests': 'requests',
+        'colorama': 'colorama',
+        'psutil': 'psutil',
+        'gputil': 'GPUtil',
+        'readchar': 'readchar',
+        'zipfile': 'Built-in',
+        'json': 'Built-in',
+        'platform': 'Built-in',
+        'math': 'Built-in',
+        'shutil': 'Built-in',
+        'subprocess': 'Built-in',
+        'datetime': 'Built-in',
+        'sys': 'Built-in',
+        'os': 'Built-in'
+    }
+
+    # Get basic system info first
+    cpu = "Unknown CPU"
+    gpu = "Unknown GPU"
+
+    # Show initial splash text
+    splash_text = f"""
+   _____ _                       ____  _____ 
+  / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
+  \__ \/ / __ `/ __ `__ \/ __ `/ / / /\__ \ 
+ ___/ / / /_/ / / / / / / /_/ / /_/ /___/ / 
+/____/_/\__, /_/ /_/ /_/\__,_/\____//____/  
+       /____/                               
+"""
+    clear_screen()
+    print(splash_text)
+    
+    # Check and install required libraries
+    print(f"{Fore.CYAN}Checking dependencies...{Style.RESET_ALL}")
+    for lib, pip_name in required_libraries.items():
+        if pip_name != 'Built-in':
+            try:
+                __import__(lib)
+                print(f"{Fore.GREEN}✓ {lib}{Style.RESET_ALL}")
+            except ImportError:
+                print(f"{Fore.YELLOW}Installing {lib}...{Style.RESET_ALL}")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                print(f"{Fore.GREEN}✓ {lib} installed{Style.RESET_ALL}")
+
+    # Get system information
+    print(f"\n{Fore.CYAN}Detecting system information...{Style.RESET_ALL}")
+    
+    try:
+        if platform.system() == "Windows":
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+            cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0]
+            cpu = (cpu.replace("(R)", "")
+                     .replace("(TM)", "")
+                     .replace("CPU ", "")
+                     .replace("Processor", "")
+                     .replace("-Core", "")
+                     .replace("  ", " ")
+                     .strip())
+            if "@" in cpu:
+                cpu = cpu.split("@")[0].strip()
+    except:
+        pass
+
+    try:
+        gpus = GPUtil.getGPUs()
+        if gpus:
+            gpu = gpus[0].name
+            gpu = (gpu.replace("NVIDIA GeForce", "NVIDIA")
+                     .replace("AMD ", "AMD Radeon ")
+                     .replace("Graphics", "")
+                     .strip())
+        else:
+            if platform.system() == "Windows":
+                try:
+                    cmd = "wmic path win32_VideoController get name"
+                    output = subprocess.check_output(cmd, shell=True).decode()
+                    gpu_lines = [line.strip() for line in output.split('\n') if line.strip()]
+                    if len(gpu_lines) > 1:
+                        gpu = gpu_lines[1]
+                        if "AMD" in gpu:
+                            gpu = gpu.replace("AMD ", "AMD Radeon ")
+                        elif "NVIDIA" in gpu:
+                            gpu = gpu.replace("NVIDIA GeForce", "NVIDIA")
+                except:
+                    pass
+    except:
+        pass
+
+    total_memory = math.ceil(psutil.virtual_memory().total / (1024**3))
+    
+    # Show final system information
+    clear_screen()
+    print(splash_text)
+    print(f"{Fore.CYAN}CPU:{Fore.WHITE} {cpu}")
+    print(f"{Fore.CYAN}GPU:{Fore.WHITE} {gpu}")
+    print(f"{Fore.CYAN}Memory:{Fore.WHITE} {total_memory}GB")
+    time.sleep(3)  # Brief pause to show system info
+    clear_screen()
+
 def interactive_shell():
+    show_splash_screen()
     show_banner()
     show_welcome_message()  # Show welcome message for new users
     aliases = load_aliases()

@@ -71,6 +71,11 @@ betatask                 # Run BetaTask
 ## Coming Soon
 
 ### Planned Features
+- `time` command
+- `systeminfo` command
+- Log-system
+- script-system, similar to bash, but with SigmaOS-commands
+- `sigmawisdom`...
 - SSH client for remote system management
 - Custom theme support and color schemes
 - Command history search with fuzzy matching
@@ -78,7 +83,7 @@ betatask                 # Run BetaTask
 Those features might come as packages or built-in.
 
 ### Upcoming Packages
-- None at the moment. Share your idea in the [official Discord](https://discord.gg/KxUfgTszjN)
+- None at the moment. Share your ideas in the [official Discord](https://discord.gg/KxUfgTszjN)
 
 ---
 
