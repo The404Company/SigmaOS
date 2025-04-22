@@ -29,7 +29,7 @@ import GPUtil
 import platform
 import math
 
-REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
+REPO_URL = "https://github.com/The404Company/SigmaOS-packages" # wow, now on a seperate repo...
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
 VERSION = "0.1.0"
