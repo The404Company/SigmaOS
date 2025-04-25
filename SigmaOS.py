@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+import threading
 
 def ensure_base_libraries():
     # Install essential libraries needed for the splash screen
@@ -12,8 +13,6 @@ def ensure_base_libraries():
             print(f"Installing required library: {lib}")
             subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
 
-# Install base requirements first
-ensure_base_libraries()
 
 # Now we can safely import these
 import requests
@@ -32,7 +31,7 @@ import math
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages" # wow, now on a seperate repo...
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 COMMAND_HISTORY = []
 MAX_HISTORY = 100
@@ -59,15 +58,40 @@ def show_banner():
     print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS {Fore.GREEN}v{VERSION}{Fore.WHITE}        ║")
     print(f"╚═════════════════════════╝{Style.RESET_ALL}")
 
-def loading_animation(message, duration=2):
+def loading_animation(message, duration=2, task=None):
+    """
+    Show a loading animation for a fixed duration or while a task runs.
+    If task is provided, it should be a function (optionally with args/kwargs).
+    """
     frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    end_time = time.time() + duration
-    i = 0
-    while time.time() < end_time:
-        print(f"\r{Fore.CYAN}{frames[i]} {message}", end="")
-        time.sleep(0.1)
-        i = (i + 1) % len(frames)
-    print(f"\r{Fore.GREEN}✓ {message}{Style.RESET_ALL}")
+    stop_event = threading.Event()
+    result = {}
+
+    def animate():
+        i = 0
+        while not stop_event.is_set():
+            print(f"\r{Fore.CYAN}{frames[i]} {message}", end="", flush=True)
+            time.sleep(0.1)
+            i = (i + 1) % len(frames)
+        print(f"\r{Fore.GREEN}✓ {message}{Style.RESET_ALL}")
+
+    if task is not None:
+        thread = threading.Thread(target=animate)
+        thread.start()
+        try:
+            result['value'] = task()
+        finally:
+            stop_event.set()
+            thread.join()
+        return result.get('value')
+    else:
+        end_time = time.time() + duration
+        i = 0
+        while time.time() < end_time:
+            print(f"\r{Fore.CYAN}{frames[i]} {message}", end="", flush=True)
+            time.sleep(0.1)
+            i = (i + 1) % len(frames)
+        print(f"\r{Fore.GREEN}✓ {message}{Style.RESET_ALL}")
 
 def load_aliases():
     if not os.path.exists(ALIASES_FILE):
@@ -178,8 +202,8 @@ def setup_essential_packages():
         except Exception as e:
             print(f"{Fore.RED}Error installing {pkg}: {e}{Style.RESET_ALL}")
     
-    # Clean up SigmaOS-main folder after all installations
-    sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-main")
+    # Clean up SigmaOS-packages-main folder after all installations
+    sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
     if os.path.exists(sigmamain_dir):
         shutil.rmtree(sigmamain_dir)
         print(f"\n{Fore.GREEN}Cleaned up temporary files{Style.RESET_ALL}")
@@ -202,8 +226,7 @@ def reset_sigmaos():
     for folder in folders_to_delete:
         if os.path.exists(folder):
             try:
-                shutil.rmtree(folder)
-                loading_animation(f"Removed {os.path.basename(folder)}")
+                loading_animation(f"Removed {os.path.basename(folder)}", task=lambda: shutil.rmtree(folder))
             except Exception as e:
                 print(f"{Fore.RED}Error removing {folder}: {e}{Style.RESET_ALL}")
     
@@ -211,7 +234,7 @@ def reset_sigmaos():
 
 def get_github_file_content(package_name, filename):
     """Fetch raw file content from GitHub"""
-    url = f"https://raw.githubusercontent.com/Lominub44/SigmaOS/main/{package_name}/{filename}"
+    url = f"https://raw.githubusercontent.com/The404Company/SigmaOS-packages/main/{package_name}/{filename}"
     try:
         response = requests.get(url)
         if response.status_code == 200:
@@ -273,11 +296,11 @@ def list_packages():
         installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
                             if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
                             and not d.startswith('.') 
-                            and d != "SigmaOS-main"]
+                            and d != "SigmaOS-packages-main"]
 
     # Get available packages from repo
     headers = {'Accept': 'application/vnd.github.v3+json'}
-    response = requests.get(f"https://api.github.com/repos/Lominub44/SigmaOS/contents/", headers=headers)
+    response = requests.get(f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/", headers=headers)
     loading_animation("Fetching packages...")
     
     if response.status_code == 200:
@@ -329,7 +352,7 @@ def download_package(package_name):
 
     download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
 
-    loading_animation(f"Downloading {package_name}")
+    loading_animation(f"Downloading {package_name}", task=lambda: requests.get(download_url))
     zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
     response = requests.get(download_url)
 
@@ -342,7 +365,7 @@ def download_package(package_name):
 
         os.remove(zip_path)
 
-        extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-main", package_name)
+        extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main", package_name)
         if os.path.exists(extracted_folder):
             if os.path.exists(package_dir):
                 shutil.rmtree(package_dir)
@@ -353,15 +376,14 @@ def download_package(package_name):
             if desc['requirements']:
                 print(f"\n{Fore.CYAN}Installing dependencies...{Style.RESET_ALL}")
                 for req in desc['requirements']:
-                    loading_animation(f"Installing {req}")
-                    subprocess.run([sys.executable, "-m", "pip", "install", req], 
+                    loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run([sys.executable, "-m", "pip", "install", req], 
                                  stdout=subprocess.DEVNULL, 
-                                 stderr=subprocess.DEVNULL)
+                                 stderr=subprocess.DEVNULL))
             
-            # Clean up SigmaOS-main folder
-            sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-main")
+            # Clean up SigmaOS-packages-main folder
+            sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
             if os.path.exists(sigmamain_dir):
-                shutil.rmtree(sigmamain_dir)
+                loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
             print(f"{Fore.GREEN}Package {package_name} successfully installed.{Style.RESET_ALL}")
         else:
             print(f"{Fore.RED}Package {package_name} not found in downloaded archive.{Style.RESET_ALL}")
@@ -378,8 +400,7 @@ def uninstall_package(package_name):
         
     try:
         print(f"{Fore.YELLOW}Uninstalling {package_name}...{Style.RESET_ALL}")
-        shutil.rmtree(package_dir)
-        loading_animation(f"Removed {package_name}")
+        loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
         return True
     except Exception as e:
         print(f"{Fore.RED}Error uninstalling {package_name}: {e}{Style.RESET_ALL}")
@@ -593,9 +614,9 @@ def show_splash_screen():
                 print(f"{Fore.GREEN}✓ {lib}{Style.RESET_ALL}")
             except ImportError:
                 print(f"{Fore.YELLOW}Installing {lib}...{Style.RESET_ALL}")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
+                loading_animation(f"Installing {lib}", task=lambda: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
                                    stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL)
+                                   stderr=subprocess.DEVNULL))
                 print(f"{Fore.GREEN}✓ {lib} installed{Style.RESET_ALL}")
 
     # Get system information
@@ -655,10 +676,16 @@ def show_splash_screen():
     clear_screen()
 
 def interactive_shell():
-    show_splash_screen()
+    # Only show splash screen and run setup if packages directory doesn't exist
+    if not os.path.exists(PACKAGES_DIR):
+        ensure_base_libraries()
+        show_splash_screen()
+        
+    
     show_banner()
-    show_welcome_message()  # Show welcome message for new users
+    show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
     aliases = load_aliases()
+    
     while True:
         try:
             command = get_command_with_history()  # Replace input() with our new function
