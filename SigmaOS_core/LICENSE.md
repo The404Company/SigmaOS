@@ -1,6 +1,6 @@
 # The "Do Whatever The F*ck You Want" License (DWTFYW)
 
-Copyright © 2024 The404Company
+Copyright © 2025 The404Company
 
 Anyone is permitted to copy, distribute, modify, merge, sell, publish, sublicense, 
 or do whatever the f*ck they want with this software for any purpose, commercial 
