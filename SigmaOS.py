@@ -31,7 +31,7 @@ import math
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages" # wow, now on a seperate repo...
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 COMMAND_HISTORY = []
 MAX_HISTORY = 100
@@ -43,7 +43,10 @@ ALL_COMMANDS = {
     'reset': [],
     'ligma': ['list', 'install', 'uninstall'],  # Added uninstall
     'alias': ['list', 'add', 'remove'],
-    'sigma': ['help', 'quit']
+    'sigma': ['help', 'quit'],
+    'sysinfo': [],
+    'now': [],
+    'timer': [],
 }
 
 init(autoreset=True)  # Initialize colorama
@@ -55,7 +58,7 @@ def show_banner():
     clear_screen()
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"{Fore.CYAN}╔═════════════════════════╗")
-    print(f"║ {Fore.WHITE}σ {Fore.YELLOW}SigmaOS {Fore.GREEN}v{VERSION}{Fore.WHITE}        ║")
+    print(f"║ {Fore.GREEN}σ SigmaOS {Fore.YELLOW}v{VERSION}{Fore.WHITE}        ║")
     print(f"╚═════════════════════════╝{Style.RESET_ALL}")
 
 def loading_animation(message, duration=2, task=None):
@@ -140,8 +143,11 @@ def show_help():
         ("exit, sigma quit", "Exit SigmaOS"),
         ("clear", "Clear the screen"),
         ("setup", "Install essential packages"),
-        ("reset", "Reset SigmaOS to default state")
-    ]
+        ("reset", "Reset SigmaOS to default state"),
+        ("sysinfo", "Show system information"),
+        ("now", "Show current date and time"),
+        ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
+        ]
     for cmd, desc in system_commands:
         print(f"{Fore.GREEN}  {cmd:<25}{Fore.WHITE} - {desc}")
 
@@ -416,8 +422,18 @@ def run_package(package_name):
     print(f"{Fore.CYAN}Running {package_name}/main.py...{Style.RESET_ALL}")
     # Pass any additional arguments after the package name
     args = [sys.executable, package_dir] + sys.argv[2:]
-    subprocess.run(args)
-    return True  # Indicate successful package execution
+    
+    # Set environment variable to prevent recursive shell instances
+    env = os.environ.copy()
+    env['SIGMAOS_SUBPROCESS'] = '1'
+    
+    # Only create new shell if not already a subprocess
+    if os.environ.get('SIGMAOS_SUBPROCESS') != '1':
+        subprocess.run(args, env=env)
+    else:
+        # If we're already a subprocess, run directly without shell
+        subprocess.run(args)
+    return True
 
 def is_valid_package(package_name):
     return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
@@ -447,6 +463,8 @@ def suggest_command(command):
         "ligma uninstall": "Uninstall a package",
         "alias list": "List all aliases",
         "alias add": "Add new alias",
+        "sysinfo": "Show system information",
+        "now": "Show current date and time",
         "alias remove": "Remove existing alias",
         "sigma help": "Show help menu",
         "sigma quit": "Exit SigmaOS"
@@ -465,7 +483,7 @@ def suggest_command(command):
             print(f"{Fore.BLUE}  Relevance: {similarity_bar:<10} {int(similarity * 100)}%")
     
         # Show quick-use hint for the best match
-        print(f"\n{Fore.WHITE}Type {Fore.GREEN}{matches[0]}{Fore.WHITE} or press {Fore.YELLOW}Tab{Fore.WHITE} to use the top suggestion{Style.RESET_ALL}")
+        print(f"\n{Fore.WHITE}Type {Fore.GREEN}{matches[0]}{Style.RESET_ALL}")
 
 def get_command_with_history():
     """Handle input with command history and tab completion"""
@@ -599,7 +617,7 @@ def show_splash_screen():
   / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
   \__ \/ / __ `/ __ `__ \/ __ `/ / / /\__ \ 
  ___/ / / /_/ / / / / / / /_/ / /_/ /___/ / 
-/____/_/\__, /_/ /_/ /_/\__,_/\____//____/  
+/____/_/\__, /_/ /_/ /_/\__,_/\____//____/   v{VERSION}
        /____/                               
 """
     clear_screen()
@@ -675,13 +693,26 @@ def show_splash_screen():
     time.sleep(3)  # Brief pause to show system info
     clear_screen()
 
+def system_info():
+    """Display system information"""
+    print(f"\n{Fore.CYAN}System Information:{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
+    print(f"{Fore.YELLOW}CPU: {psutil.cpu_count(logical=False)} cores")
+    print(f"{Fore.YELLOW}Logical CPUs: {psutil.cpu_count(logical=True)}")
+    print(f"{Fore.YELLOW}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
+    print(f"{Fore.YELLOW}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
+    print(f"{Fore.YELLOW}Python Version: {platform.python_version()}")
+
 def interactive_shell():
+    # Exit if we're a subprocess instance
+    if os.environ.get('SIGMAOS_SUBPROCESS') == '1':
+        return
+    
     # Only show splash screen and run setup if packages directory doesn't exist
     if not os.path.exists(PACKAGES_DIR):
         ensure_base_libraries()
         show_splash_screen()
-        
-    
+
     show_banner()
     show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
     aliases = load_aliases()
@@ -697,7 +728,7 @@ def interactive_shell():
             # Split command into parts
             parts = command.split()
             
-            # Handle package calls with arguments (e.g. "yapper test.txt")
+            # Handle package calls with arguments (e.g. "yapper test.txt" (bad example))
             if parts and is_valid_package(parts[0]):
                 sys.argv = parts  # Set sys.argv to include command arguments
                 run_package(parts[0])
@@ -754,9 +785,38 @@ def interactive_shell():
                 else:
                     print(f"{Fore.YELLOW}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
             
-            elif main_command == "delta":
-                delta_command(args)
+            elif main_command == "sysinfo":
+                system_info()
+
+            elif main_command == "now":
+                print(f"{Fore.CYAN}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
             
+            elif main_command == "timer":
+                if args and len(args) == 2:
+                    try:
+                        duration = int(args[0])
+                        unit = args[1].lower()
+                        if unit in ["s", "sec", "seconds"]:
+                            time.sleep(duration)
+                            print(f"{Fore.GREEN}Timer finished!{Style.RESET_ALL}")
+                        elif unit in ["m", "min", "minutes"]:
+                            time.sleep(duration * 60)
+                            print(f"{Fore.GREEN}Timer finished!{Style.RESET_ALL}")
+                        elif unit in ["h", "hr", "hours"]:
+                            time.sleep(duration * 3600)
+                            print(f"{Fore.GREEN}Timer finished!{Style.RESET_ALL}")
+                        else:
+                            print(f"{Fore.RED}Invalid time unit. Use s, m, or h.{Style.RESET_ALL}")
+                    except ValueError:
+                        print(f"{Fore.RED}Invalid duration. Please enter a number.{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.YELLOW}Usage: timer <duration> <unit (s/m/h)>{Style.RESET_ALL}")
+                    print(f"{Fore.CYAN}Pro tip: You can type a command during the timer (you won't see it)")
+                    print(f"{Fore.CYAN}and press Enter to execute it when the timer finishes!{Style.RESET_ALL}")
+
+            elif main_command == "rick":
+                subprocess.run(["curl", "ascii.live/rick"])
+
             elif main_command == "alias":
                 if not args:
                     list_aliases()

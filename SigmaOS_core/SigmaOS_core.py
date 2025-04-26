@@ -6,10 +6,7 @@ import threading
 
 def clear_screen():
     """Clears the terminal screen"""
-    if os.name == 'nt':  # For Windows
-        os.system('cls')
-    else:  # For Unix/Linux/Mac
-        os.system('clear')
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def press_enter_to_continue():
     """Prompts the user to press Enter to continue."""
