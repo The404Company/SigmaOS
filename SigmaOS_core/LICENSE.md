@@ -7,7 +7,7 @@ or do whatever the f*ck they want with this software for any purpose, commercial
 or non-commercial, and by any means.
 
                     DO WHATEVER THE F*CK YOU WANT PUBLIC LICENSE
-                               Version 1, 2024
+                               Version 1, 2025
 
 By using or distributing this software you accept that:
 
