@@ -25,7 +25,7 @@ def main():
     
     # Final clear screen
     clear_screen()
-    print("Demo completed!")
+    log("Demo completed!") # doesn't work here...
 
 if __name__ == "__main__":
     main()

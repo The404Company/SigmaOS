@@ -3,9 +3,14 @@ import sys
 import os
 import threading
 
+REPO_URL = "https://github.com/The404Company/SigmaOS-packages" # wow, now on a seperate repo...
+PACKAGES_DIR = "packages"
+ALIASES_FILE = "aliases.json"
+VERSION = "0.1.3"
+
 def ensure_base_libraries():
     # Install essential libraries needed for the splash screen
-    base_requirements = ['colorama', 'psutil', 'gputil', 'requests', 'readchar']
+    base_requirements = ['colorama', 'psutil', 'gputil', 'requests', 'readchar', 'datetime', 'uuid']
     for lib in base_requirements:
         try:
             __import__(lib)
@@ -13,6 +18,9 @@ def ensure_base_libraries():
             print(f"Installing required library: {lib}")
             subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
 
+# Only  run setup if packages directory doesn't exist
+if not os.path.exists(PACKAGES_DIR):
+    ensure_base_libraries()
 
 # Now we can safely import these
 import requests
@@ -28,10 +36,6 @@ import GPUtil
 import platform
 import math
 
-REPO_URL = "https://github.com/The404Company/SigmaOS-packages" # wow, now on a seperate repo...
-PACKAGES_DIR = "packages"
-ALIASES_FILE = "aliases.json"
-VERSION = "0.1.2"
 
 COMMAND_HISTORY = []
 MAX_HISTORY = 100
@@ -46,6 +50,7 @@ ALL_COMMANDS = {
     'sigma': ['help', 'quit'],
     'sysinfo': [],
     'now': [],
+    'sendlogs': [],
     'timer': [],
 }
 
@@ -146,6 +151,7 @@ def show_help():
         ("reset", "Reset SigmaOS to default state"),
         ("sysinfo", "Show system information"),
         ("now", "Show current date and time"),
+        ("sendlogs", "Send logs to Discord"),
         ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
         ]
     for cmd, desc in system_commands:
@@ -184,6 +190,88 @@ def show_help():
         print(f"{Fore.YELLOW}  {key:<25}{Fore.WHITE} - {desc}")
 
     print(f"\n{Fore.YELLOW}╚{'═' * 41}╝{Style.RESET_ALL}")
+
+import uuid
+import os
+import json
+
+def get_user_uuid():
+    """Get or create a unique, anonymized UUID for the user."""
+    uuid_file = os.path.join(os.path.dirname(__file__), "user_uuid.json")
+    try:
+        if os.path.exists(uuid_file):
+            with open(uuid_file, "r") as f:
+                data = json.load(f)
+                return data.get("uuid", str(uuid.uuid4()))
+        else:
+            user_uuid = str(uuid.uuid4())
+            with open(uuid_file, "w") as f:
+                json.dump({"uuid": user_uuid}, f)
+            return user_uuid
+    except Exception as e:
+        print(f"{Fore.RED}Error handling UUID: {e}{Style.RESET_ALL}")
+        return str(uuid.uuid4())
+
+def send_logs_to_discord():
+    """
+    Sends all log files in the 'logs' folder to a Discord webhook,
+    then deletes the log files.
+    """
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    webhook_url = "https://discord.com/api/webhooks/1366094221714653244/U5O-2im9BovXLdscZZmsrxpnqRBiB9sdgVQJfJphSzIywGChitvdBeXl70fPvoQ228BX" # pls do not spam :)
+
+    if not os.path.exists(logs_dir):
+        print(f"{Fore.YELLOW}No logs directory found.{Style.RESET_ALL}")
+        return
+
+    log_files = [f for f in os.listdir(logs_dir) if f.endswith(".log")]
+    if not log_files:
+        print(f"{Fore.YELLOW}No log files to send.{Style.RESET_ALL}")
+        return
+
+    # Get user UUID
+    user_uuid = get_user_uuid()
+
+    # Ask for confirmation
+    print(f"\n{Fore.YELLOW}Warning: External packages might include personal data in logs.{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}Do you want to send the logs to Discord? (Y/n): {Style.RESET_ALL}", end="")
+    confirm = input().strip().lower()
+    if confirm != 'y' and confirm != '':
+        print(f"{Fore.RED}Log sending cancelled.{Style.RESET_ALL}")
+        return
+
+    message = f"User UUID: {user_uuid}\n"
+    for log_file in log_files:
+        log_path = os.path.join(logs_dir, log_file)
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+            message += f"\n{log_file}:\n{content}\n"
+        except Exception as e:
+            print(f"{Fore.RED}Error reading {log_file}: {e}{Style.RESET_ALL}")
+
+    if not message.strip():
+        print(f"{Fore.YELLOW}No log content to send.{Style.RESET_ALL}")
+        return
+
+    # Discord message limit is 2000 characters, so chunk if needed
+    max_length = 1900  # leave room for formatting
+    messages = [message[i:i+max_length] for i in range(0, len(message), max_length)]
+
+    for msg in messages:
+        data = {"content": msg}
+        response = requests.post(webhook_url, json=data)
+        if response.status_code == 204 or response.status_code == 200:
+            print(f"{Fore.GREEN}Logs sent to Discord webhook.{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED}Failed to send logs: {response.status_code} {response.text}{Style.RESET_ALL}")
+
+    # Delete log files after sending
+    for log_file in log_files:
+        try:
+            os.remove(os.path.join(logs_dir, log_file))
+        except Exception as e:
+            print(f"{Fore.RED}Error deleting {log_file}: {e}{Style.RESET_ALL}")
 
 def setup_essential_packages():
     essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
@@ -465,6 +553,7 @@ def suggest_command(command):
         "alias add": "Add new alias",
         "sysinfo": "Show system information",
         "now": "Show current date and time",
+        "sendlogs": "Send logs to Discord",
         "alias remove": "Remove existing alias",
         "sigma help": "Show help menu",
         "sigma quit": "Exit SigmaOS"
@@ -708,9 +797,8 @@ def interactive_shell():
     if os.environ.get('SIGMAOS_SUBPROCESS') == '1':
         return
     
-    # Only show splash screen and run setup if packages directory doesn't exist
+    # only show splash screen if packages directory doesn't exist
     if not os.path.exists(PACKAGES_DIR):
-        ensure_base_libraries()
         show_splash_screen()
 
     show_banner()
@@ -791,6 +879,9 @@ def interactive_shell():
             elif main_command == "now":
                 print(f"{Fore.CYAN}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
             
+            elif main_command == "sendlogs":
+                send_logs_to_discord()
+
             elif main_command == "timer":
                 if args and len(args) == 2:
                     try:
