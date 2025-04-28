@@ -15,6 +15,10 @@ A lightweight and modular command-line interface system with package management 
 - `clear` - Clear the terminal screen
 - `setup` - Install essential packages
 - `reset` - Restore SigmaOS to its default settings
+- `sysinfo` - Show system information
+- `now` - Show current date and time
+- `sendlogs` - Send logs to the official Discord-Server
+- `timer <number> <s|m|h>` - Set timer in seconds, minutes or hours. Commands can be typed during countdown.
 
 ### Package Management
 - `ligma list` - List all available packages
@@ -42,6 +46,11 @@ A lightweight and modular command-line interface system with package management 
 - **Sourcerer** - Package installer for external sources
 - **XiAI** - Intelligent assistant designed for SigmaOS
 
+### Other packages
+- **LigmaDev** - Developer tools for SigmaOS
+- **Sourcerer** - Package installer for external sources
+- **Sucker** - File downloader
+
 ## Keyboard Shortcuts
 - `Tab` - Auto-complete commands
 - `Up/Down` - Navigate through command history
@@ -63,6 +72,7 @@ betatask                 # Run BetaTask
 ## Features
 - Smart command auto-completion
 - Command history navigation
+- Custom theme support
 - Customizable aliases
 - Package management system
 - Built-in help system
@@ -71,13 +81,10 @@ betatask                 # Run BetaTask
 ## Coming Soon
 
 ### Planned Features
-- `time` command
-- `systeminfo` command
-- Log-system
 - script-system, similar to bash, but with SigmaOS-commands
 - `sigmawisdom`...
 - SSH client for remote system management
-- Custom theme support and color schemes
+- edit theme commands
 - Command history search with fuzzy matching
 - GUI-packages (2025/2026)
 Those features might come as packages or built-in.
