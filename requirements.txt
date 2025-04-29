@@ -1,0 +1,6 @@
+colorama==0.4.6
+requests==2.31.0
+psutil==5.9.8
+GPUtil==1.4.0
+readchar==4.0.5
+uuid==1.30

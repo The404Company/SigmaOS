@@ -8,8 +8,9 @@ from colorama import init, Fore, Back, Style
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
-THEME_FILE = "theme.sct" # no, its not 'Windows Script Component'. SCT stands for 'SigmaOS Color Theme'. File-icon looks nice though :)
-VERSION = "0.1.4"
+THEME_FILE = "theme.sth"
+VERSION = "0.1.5"
+LOG_FILE = None
 
 class Theme:
     def __init__(self):
@@ -38,57 +39,57 @@ class Theme:
     def create_default_theme(self):
         """Create default theme file"""
         default_theme = {
-            "banner_sct": "cyan",
-            "version_sct": "yellow",
-            "success_sct": "green",
-            "error_sct": "red",
-            "warning_sct": "yellow",
-            "info_sct": "cyan",
-            "header_sct": "yellow",
-            "command_sct": "green",
-            "description_sct": "white",
-            "author_sct": "cyan",
-            "loading_sct": "cyan",
-            "prompt_sct": "green",
-            "suggestion_sct": "cyan",
-            "relevance_sct": "blue",
-            "system_info_sct": "yellow",
-            "timer_sct": "green",
-            "alias_sct": "green",
-            "package_sct": "green",
-            "package_version_sct": "cyan",
-            "package_author_sct": "cyan",
-            "package_description_sct": "white",
-            "package_installed_sct": "green",
-            "package_not_installed_sct": "yellow",
-            "package_error_sct": "red",
-            "package_loading_sct": "cyan",
-            "package_skipped_sct": "yellow",
-            "package_cleanup_sct": "green",
-            "package_download_sct": "cyan",
-            "package_install_sct": "cyan",
-            "package_uninstall_sct": "yellow",
-            "package_reset_sct": "red",
-            "package_setup_sct": "cyan",
-            "package_essential_sct": "green",
-            "package_already_installed_sct": "yellow",
-            "package_not_found_sct": "red",
-            "package_download_error_sct": "red",
-            "package_install_error_sct": "red",
-            "package_uninstall_error_sct": "red",
-            "package_reset_error_sct": "red",
-            "package_setup_error_sct": "red",
-            "package_essential_error_sct": "red",
-            "package_already_installed_error_sct": "red",
-            "package_not_found_error_sct": "red",
-            "package_download_success_sct": "green",
-            "package_install_success_sct": "green",
-            "package_uninstall_success_sct": "green",
-            "package_reset_success_sct": "green",
-            "package_setup_success_sct": "green",
-            "package_essential_success_sct": "green",
-            "package_already_installed_success_sct": "green",
-            "package_not_found_success_sct": "green"
+            "banner_sth": "cyan",
+            "version_sth": "yellow",
+            "success_sth": "green",
+            "error_sth": "red",
+            "warning_sth": "yellow",
+            "info_sth": "cyan",
+            "header_sth": "yellow",
+            "command_sth": "green",
+            "description_sth": "white",
+            "author_sth": "cyan",
+            "loading_sth": "cyan",
+            "prompt_sth": "green",
+            "suggestion_sth": "cyan",
+            "relevance_sth": "blue",
+            "system_info_sth": "yellow",
+            "timer_sth": "green",
+            "alias_sth": "green",
+            "package_sth": "green",
+            "package_version_sth": "cyan",
+            "package_author_sth": "cyan",
+            "package_description_sth": "white",
+            "package_installed_sth": "green",
+            "package_not_installed_sth": "yellow",
+            "package_error_sth": "red",
+            "package_loading_sth": "cyan",
+            "package_skipped_sth": "yellow",
+            "package_cleanup_sth": "green",
+            "package_download_sth": "cyan",
+            "package_install_sth": "cyan",
+            "package_uninstall_sth": "yellow",
+            "package_reset_sth": "red",
+            "package_setup_sth": "cyan",
+            "package_essential_sth": "green",
+            "package_already_installed_sth": "yellow",
+            "package_not_found_sth": "red",
+            "package_download_error_sth": "red",
+            "package_install_error_sth": "red",
+            "package_uninstall_error_sth": "red",
+            "package_reset_error_sth": "red",
+            "package_setup_error_sth": "red",
+            "package_essential_error_sth": "red",
+            "package_already_installed_error_sth": "red",
+            "package_not_found_error_sth": "red",
+            "package_download_success_sth": "green",
+            "package_install_success_sth": "green",
+            "package_uninstall_success_sth": "green",
+            "package_reset_success_sth": "green",
+            "package_setup_success_sth": "green",
+            "package_essential_success_sth": "green",
+            "package_already_installed_success_sth": "green",
+            "package_not_found_success_sth": "green"
         }
         
         with open(THEME_FILE, 'w') as f:
@@ -152,8 +153,8 @@ def clear_screen():
 def show_banner():
     clear_screen()
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"{banner_sct}╔═════════════════════════╗")
-    print(f"║ {command_sct}σ SigmaOS {version_sct}v{VERSION}{description_sct}        ║")
+    print(f"{banner_sth}╔═════════════════════════╗")
+    print(f"║ {command_sth}σ SigmaOS {version_sth}v{VERSION}{description_sth}        ║")
     print(f"╚═════════════════════════╝{Style.RESET_ALL}")
 
 def loading_animation(message, duration=2, task=None):
@@ -168,10 +169,10 @@ def loading_animation(message, duration=2, task=None):
     def animate():
         i = 0
         while not stop_event.is_set():
-            print(f"\r{loading_sct}{frames[i]} {message}", end="", flush=True)
+            print(f"\r{loading_sth}{frames[i]} {message}", end="", flush=True)
             time.sleep(0.1)
             i = (i + 1) % len(frames)
-        print(f"\r{success_sct}✓ {message}{Style.RESET_ALL}")
+        print(f"\r{success_sth}✓ {message}{Style.RESET_ALL}")
 
     if task is not None:
         thread = threading.Thread(target=animate)
@@ -186,10 +187,10 @@ def loading_animation(message, duration=2, task=None):
         end_time = time.time() + duration
         i = 0
         while time.time() < end_time:
-            print(f"\r{loading_sct}{frames[i]} {message}", end="", flush=True)
+            print(f"\r{loading_sth}{frames[i]} {message}", end="", flush=True)
             time.sleep(0.1)
             i = (i + 1) % len(frames)
-        print(f"\r{success_sct}✓ {message}{Style.RESET_ALL}")
+        print(f"\r{success_sth}✓ {message}{Style.RESET_ALL}")
 
 def load_aliases():
     if not os.path.exists(ALIASES_FILE):
@@ -208,31 +209,31 @@ def add_alias(name, command):
     aliases = load_aliases()
     aliases[name] = command
     save_aliases(aliases)
-    print(f"{success_sct}Added alias: {name} → {command}{Style.RESET_ALL}")
+    print(f"{success_sth}Added alias: {name} → {command}{Style.RESET_ALL}")
 
 def remove_alias(name):
     aliases = load_aliases()
     if name in aliases:
         del aliases[name]
         save_aliases(aliases)
-        print(f"{success_sct}Removed alias: {name}{Style.RESET_ALL}")
+        print(f"{success_sth}Removed alias: {name}{Style.RESET_ALL}")
     else:
-        print(f"{error_sct}Alias not found: {name}{Style.RESET_ALL}")
+        print(f"{error_sth}Alias not found: {name}{Style.RESET_ALL}")
 
 def list_aliases():
     aliases = load_aliases()
     if aliases:
-        print(f"\n{header_sct}Configured aliases:{Style.RESET_ALL}")
+        print(f"\n{header_sth}Configured aliases:{Style.RESET_ALL}")
         for name, command in aliases.items():
-            print(f"{alias_sct}  {name} {description_sct}→ {command}")
+            print(f"{alias_sth}  {name} {description_sth}→ {command}")
     else:
-        print(f"{warning_sct}No aliases configured.{Style.RESET_ALL}")
+        print(f"{warning_sth}No aliases configured.{Style.RESET_ALL}")
 
 def show_help():
-    print(f"\n{header_sct}╔══ SigmaOS Help ══════════════════════════╗{Style.RESET_ALL}")
+    print(f"\n{header_sth}╔══ SigmaOS Help ══════════════════════════╗{Style.RESET_ALL}")
     
     # System Commands
-    print(f"\n{info_sct}System Commands:{Style.RESET_ALL}")
+    print(f"\n{info_sth}System Commands:{Style.RESET_ALL}")
     system_commands = [
         ("help", "Show this help message"),
         ("exit, sigma quit", "Exit SigmaOS"),
@@ -245,10 +246,10 @@ def show_help():
         ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
         ]
     for cmd, desc in system_commands:
-        print(f"{command_sct}  {cmd:<25}{description_sct} - {desc}")
+        print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
 
     # Package Management
-    print(f"\n{info_sct}Package Management:{Style.RESET_ALL}")
+    print(f"\n{info_sth}Package Management:{Style.RESET_ALL}")
     pkg_commands = [
         ("ligma list", "List available packages"),
         ("ligma install <pkg>", "Install a package"),
@@ -256,20 +257,20 @@ def show_help():
         ("<package>", "Run a package directly")
     ]
     for cmd, desc in pkg_commands:
-        print(f"{command_sct}  {cmd:<25}{description_sct} - {desc}")
+        print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
 
     # Alias Management
-    print(f"\n{info_sct}Alias Management:{Style.RESET_ALL}")
+    print(f"\n{info_sth}Alias Management:{Style.RESET_ALL}")
     alias_commands = [
         ("alias list", "List all aliases"),
         ("alias add <name> <cmd>", "Add new alias"),
         ("alias remove <name>", "Remove alias")
     ]
     for cmd, desc in alias_commands:
-        print(f"{command_sct}  {cmd:<25}{description_sct} - {desc}")
+        print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
 
     # Keyboard Shortcuts
-    print(f"\n{info_sct}Keyboard Shortcuts:{Style.RESET_ALL}")
+    print(f"\n{info_sth}Keyboard Shortcuts:{Style.RESET_ALL}")
     shortcuts = [
         ("Tab", "Auto-complete commands"),
         ("Up/Down", "Navigate command history"),
@@ -277,9 +278,9 @@ def show_help():
         ("Ctrl+C", "Interrupt current operation")
     ]
     for key, desc in shortcuts:
-        print(f"{warning_sct}  {key:<25}{description_sct} - {desc}")
+        print(f"{warning_sth}  {key:<25}{description_sth} - {desc}")
 
-    print(f"\n{header_sct}╚{'═' * 41}╝{Style.RESET_ALL}")
+    print(f"\n{header_sth}╚{'═' * 41}╝{Style.RESET_ALL}")
 
 import uuid
 import os
@@ -299,7 +300,7 @@ def get_user_uuid():
                 json.dump({"uuid": user_uuid}, f)
             return user_uuid
     except Exception as e:
-        print(f"{error_sct}Error handling UUID: {e}{Style.RESET_ALL}")
+        print(f"{error_sth}Error handling UUID: {e}{Style.RESET_ALL}")
         return str(uuid.uuid4())
 
 def send_logs_to_discord():
@@ -311,23 +312,23 @@ def send_logs_to_discord():
     webhook_url = "https://discord.com/api/webhooks/1366094221714653244/U5O-2im9BovXLdscZZmsrxpnqRBiB9sdgVQJfJphSzIywGChitvdBeXl70fPvoQ228BX" # pls do not spam :)
 
     if not os.path.exists(logs_dir):
-        print(f"{warning_sct}No logs directory found.{Style.RESET_ALL}")
+        print(f"{warning_sth}No logs directory found.{Style.RESET_ALL}")
         return
 
     log_files = [f for f in os.listdir(logs_dir) if f.endswith(".log")]
     if not log_files:
-        print(f"{warning_sct}No log files to send.{Style.RESET_ALL}")
+        print(f"{warning_sth}No log files to send.{Style.RESET_ALL}")
         return
 
     # Get user UUID
     user_uuid = get_user_uuid()
 
     # Ask for confirmation
-    print(f"\n{warning_sct}Warning: External packages might include personal data in logs.{Style.RESET_ALL}")
-    print(f"{warning_sct}Do you want to send the logs to Discord? (Y/n): {Style.RESET_ALL}", end="")
+    print(f"\n{warning_sth}Warning: External packages might include personal data in logs.{Style.RESET_ALL}")
+    print(f"{warning_sth}Do you want to send the logs to Discord? (Y/n): {Style.RESET_ALL}", end="")
     confirm = input().strip().lower()
     if confirm != 'y' and confirm != '':
-        print(f"{error_sct}Log sending cancelled.{Style.RESET_ALL}")
+        print(f"{error_sth}Log sending cancelled.{Style.RESET_ALL}")
         return
 
     message = f"User UUID: {user_uuid}\n"
@@ -338,10 +339,10 @@ def send_logs_to_discord():
                 content = f.read().strip()
             message += f"\n{log_file}:\n{content}\n"
         except Exception as e:
-            print(f"{error_sct}Error reading {log_file}: {e}{Style.RESET_ALL}")
+            print(f"{error_sth}Error reading {log_file}: {e}{Style.RESET_ALL}")
 
     if not message.strip():
-        print(f"{warning_sct}No log content to send.{Style.RESET_ALL}")
+        print(f"{warning_sth}No log content to send.{Style.RESET_ALL}")
         return
 
     # Discord message limit is 2000 characters, so chunk if needed
@@ -352,45 +353,45 @@ def send_logs_to_discord():
         data = {"content": msg}
         response = requests.post(webhook_url, json=data)
         if response.status_code == 204 or response.status_code == 200:
-            print(f"{success_sct}Logs sent to Discord webhook.{Style.RESET_ALL}")
+            print(f"{success_sth}Logs sent to Discord webhook.{Style.RESET_ALL}")
         else:
-            print(f"{error_sct}Failed to send logs: {response.status_code} {response.text}{Style.RESET_ALL}")
+            print(f"{error_sth}Failed to send logs: {response.status_code} {response.text}{Style.RESET_ALL}")
 
     # Delete log files after sending
     for log_file in log_files:
         try:
             os.remove(os.path.join(logs_dir, log_file))
         except Exception as e:
-            print(f"{error_sct}Error deleting {log_file}: {e}{Style.RESET_ALL}")
+            print(f"{error_sth}Error deleting {log_file}: {e}{Style.RESET_ALL}")
 
 def setup_essential_packages():
     essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
     
-    print(f"\n{info_sct}Installing essential packages...{Style.RESET_ALL}")
-    print(f"{description_sct}The following packages will be installed:{Style.RESET_ALL}")
+    print(f"\n{info_sth}Installing essential packages...{Style.RESET_ALL}")
+    print(f"{description_sth}The following packages will be installed:{Style.RESET_ALL}")
     for pkg in essential_packages:
-        print(f"{command_sct}  ▶ {pkg}")
+        print(f"{command_sth}  ▶ {pkg}")
     
-    confirm = input(f"\n{warning_sct}Do you want to proceed? (y/N): {Style.RESET_ALL}")
+    confirm = input(f"\n{warning_sth}Do you want to proceed? (y/N): {Style.RESET_ALL}")
     if confirm.lower() != 'y':
-        print(f"{error_sct}Setup cancelled.{Style.RESET_ALL}")
+        print(f"{error_sth}Setup cancelled.{Style.RESET_ALL}")
         return
     
     for pkg in essential_packages:
         try:
             if not is_valid_package(pkg):
-                print(f"\n{info_sct}Installing {pkg}...{Style.RESET_ALL}")
+                print(f"\n{info_sth}Installing {pkg}...{Style.RESET_ALL}")
                 download_package(pkg)
             else:
-                print(f"{warning_sct}Package {pkg} is already installed.{Style.RESET_ALL}")
+                print(f"{warning_sth}Package {pkg} is already installed.{Style.RESET_ALL}")
         except Exception as e:
-            print(f"{error_sct}Error installing {pkg}: {e}{Style.RESET_ALL}")
+            print(f"{error_sth}Error installing {pkg}: {e}{Style.RESET_ALL}")
     
     # Clean up SigmaOS-packages-main folder after all installations
     sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
     if os.path.exists(sigmamain_dir):
         shutil.rmtree(sigmamain_dir)
-        print(f"\n{success_sct}Cleaned up temporary files{Style.RESET_ALL}")
+        print(f"\n{success_sth}Cleaned up temporary files{Style.RESET_ALL}")
 
 def reset_sigmaos():
     """Reset SigmaOS by removing documents, packages and pycache folders"""
@@ -400,11 +401,11 @@ def reset_sigmaos():
         os.path.join(os.path.dirname(__file__), "__pycache__")
     ]
     
-    print(f"\n{warning_sct}Warning: This will delete all installed packages and documents!{Style.RESET_ALL}")
-    confirm = input(f"{error_sct}Are you sure you want to reset SigmaOS? (y/N): {Style.RESET_ALL}")
+    print(f"\n{warning_sth}Warning: This will delete all installed packages and documents!{Style.RESET_ALL}")
+    confirm = input(f"{error_sth}Are you sure you want to reset SigmaOS? (y/N): {Style.RESET_ALL}")
     
     if confirm.lower() != 'y':
-        print(f"{success_sct}Reset cancelled.{Style.RESET_ALL}")
+        print(f"{success_sth}Reset cancelled.{Style.RESET_ALL}")
         return
         
     for folder in folders_to_delete:
@@ -412,9 +413,9 @@ def reset_sigmaos():
             try:
                 loading_animation(f"Removed {os.path.basename(folder)}", task=lambda: shutil.rmtree(folder))
             except Exception as e:
-                print(f"{error_sct}Error removing {folder}: {e}{Style.RESET_ALL}")
+                print(f"{error_sth}Error removing {folder}: {e}{Style.RESET_ALL}")
     
-    print(f"\n{success_sct}SigmaOS has been reset to default state.{Style.RESET_ALL}")
+    print(f"\n{success_sth}SigmaOS has been reset to default state.{Style.RESET_ALL}")
 
 def get_github_file_content(package_name, filename):
     """Fetch raw file content from GitHub"""
@@ -492,37 +493,37 @@ def list_packages():
         available_packages = [item["name"] for item in data 
                             if item["type"] == "dir" and not item["name"].startswith('.')]
         
-        print(f"\n{info_sct}Available packages:{Style.RESET_ALL}")
+        print(f"\n{info_sth}Available packages:{Style.RESET_ALL}")
         packages_found = False
         
         # Show installed packages first
         if installed_packages:
-            print(f"\n{success_sct}Installed:{Style.RESET_ALL}")
+            print(f"\n{success_sth}Installed:{Style.RESET_ALL}")
             for i, pkg in enumerate(installed_packages):
                 if i > 0:  # Add empty line before each package except the first one
                     print()
                 desc = get_package_description(pkg)
-                print(f"{package_installed_sct}{pkg} {description_sct}- {desc['description']}")
-                print(f"{package_version_sct}{desc['author']} {description_sct}- v{desc['version']}")
+                print(f"{package_installed_sth}{pkg} {description_sth}- {desc['description']}")
+                print(f"{package_version_sth}{desc['author']} {description_sth}- v{desc['version']}")
                 packages_found = True
         
         # Show available but not installed packages
         not_installed = [pkg for pkg in available_packages if pkg not in installed_packages]
         if not_installed:
-            print(f"\n{warning_sct}Not Installed:{Style.RESET_ALL}")
+            print(f"\n{warning_sth}Not Installed:{Style.RESET_ALL}")
             for i, pkg in enumerate(not_installed):
                 if i > 0:  # Add empty line before each package except the first one
                     print()
                 desc = get_package_description(pkg, installed=False)
-                print(f"{description_sct}{pkg} - {desc['description']}")
-                print(f"{package_version_sct}{desc['author']} - v{desc['version']}")
+                print(f"{description_sth}{pkg} - {desc['description']}")
+                print(f"{package_version_sth}{desc['author']} - v{desc['version']}")
                 packages_found = True
         
         if not packages_found:
-            print(f"{error_sct}No packages found in repository.{Style.RESET_ALL}")
+            print(f"{error_sth}No packages found in repository.{Style.RESET_ALL}")
     else:
-        print(f"{error_sct}Error fetching repositories. Status code: {response.status_code}{Style.RESET_ALL}")
-        print(f"{error_sct}Response: {response.text}{Style.RESET_ALL}")
+        print(f"{error_sth}Error fetching repositories. Status code: {response.status_code}{Style.RESET_ALL}")
+        print(f"{error_sth}Response: {response.text}{Style.RESET_ALL}")
 
 def download_package(package_name):
     if not os.path.exists(PACKAGES_DIR):
@@ -531,7 +532,7 @@ def download_package(package_name):
     package_dir = os.path.join(PACKAGES_DIR, package_name)
 
     if os.path.exists(package_dir):
-        print(f"{warning_sct}Package {package_name} already downloaded.{Style.RESET_ALL}")
+        print(f"{warning_sth}Package {package_name} already downloaded.{Style.RESET_ALL}")
         return
 
     download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
@@ -558,11 +559,11 @@ def download_package(package_name):
             # Install package requirements
             desc = get_package_description(package_name)
             if desc['requirements']:
-                print(f"\n{info_sct}Installing dependencies...{Style.RESET_ALL}")
+                print(f"\n{info_sth}Installing dependencies...{Style.RESET_ALL}")
                 core_libs = {"colorama", "requests", "datetime", "json"}
                 for req in desc['requirements']:
                     if req.lower() in core_libs:
-                        print(f"{warning_sct}Skipping {req} (already included in SigmaOS).{Style.RESET_ALL}")
+                        print(f"{warning_sth}Skipping {req} (already included in SigmaOS).{Style.RESET_ALL}")
                     else:
                         loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run([sys.executable, "-m", "pip", "install", req], 
                                      stdout=subprocess.DEVNULL, 
@@ -572,36 +573,39 @@ def download_package(package_name):
             sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
             if os.path.exists(sigmamain_dir):
                 loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
-            print(f"{success_sct}Package {package_name} successfully installed.{Style.RESET_ALL}")
+            print(f"{success_sth}Package {package_name} successfully installed.{Style.RESET_ALL}")
+            log(f"Package {package_name} successfully installed.")
         else:
-            print(f"{error_sct}Package {package_name} not found in downloaded archive.{Style.RESET_ALL}")
+            print(f"{error_sth}Package {package_name} not found in downloaded archive.{Style.RESET_ALL}")
+            log(f"Package {package_name} not found in downloaded archive.")
     else:
-        print(f"{error_sct}Error downloading package {package_name}.{Style.RESET_ALL}")
+        print(f"{error_sth}Error downloading package {package_name}.{Style.RESET_ALL}")
+        log(f"Error downloading package {package_name}.")
 
 def uninstall_package(package_name):
     """Uninstall a package by removing its directory"""
     package_dir = os.path.join(PACKAGES_DIR, package_name)
     
     if not os.path.exists(package_dir):
-        print(f"{error_sct}Package {package_name} is not installed.{Style.RESET_ALL}")
+        print(f"{error_sth}Package {package_name} is not installed.{Style.RESET_ALL}")
         return False
         
     try:
-        print(f"{warning_sct}Uninstalling {package_name}...{Style.RESET_ALL}")
+        print(f"{warning_sth}Uninstalling {package_name}...{Style.RESET_ALL}")
         loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
         return True
     except Exception as e:
-        print(f"{error_sct}Error uninstalling {package_name}: {e}{Style.RESET_ALL}")
+        print(f"{error_sth}Error uninstalling {package_name}: {e}{Style.RESET_ALL}")
         return False
 
 def run_package(package_name):
     package_dir = os.path.join(PACKAGES_DIR, package_name, "main.py")
 
     if not os.path.exists(package_dir):
-        print(f"{error_sct}main.py not found in {package_name}.{Style.RESET_ALL}")
+        print(f"{error_sth}main.py not found in {package_name}.{Style.RESET_ALL}")
         return False
 
-    print(f"{info_sct}Running {package_name}/main.py...{Style.RESET_ALL}")
+    print(f"{info_sth}Running {package_name}/main.py...{Style.RESET_ALL}")
     # Pass any additional arguments after the package name
     args = [sys.executable, package_dir] + sys.argv[2:]
     
@@ -622,12 +626,12 @@ def is_valid_package(package_name):
 
 def show_welcome_message():
     if not os.path.exists(PACKAGES_DIR) or not os.listdir(PACKAGES_DIR):
-        print(f"\n{info_sct}Welcome to SigmaOS!{Style.RESET_ALL}")
-        print(f"{description_sct}It looks like this is your first time using SigmaOS.")
-        print(f"{command_sct}To get started, try these commands:")
-        print(f"{success_sct}  setup{description_sct}     - Install essential packages")
-        print(f"{success_sct}  help{description_sct}      - Show all available commands")
-        print(f"{success_sct}  ligma list{description_sct} - Show available packages\n")
+        print(f"\n{info_sth}Welcome to SigmaOS!{Style.RESET_ALL}")
+        print(f"{description_sth}It looks like this is your first time using SigmaOS.")
+        print(f"{command_sth}To get started, try these commands:")
+        print(f"{success_sth}  setup{description_sth}     - Install essential packages")
+        print(f"{success_sth}  help{description_sth}      - Show all available commands")
+        print(f"{success_sth}  ligma list{description_sth} - Show available packages\n")
 
 def suggest_command(command):
     """Enhanced command suggestions with inline display"""
@@ -657,23 +661,23 @@ def suggest_command(command):
     matches = get_close_matches(command, command_suggestions.keys(), n=3, cutoff=0.5)
     
     if matches:
-        print(f"\n{warning_sct}Suggestions:{Style.RESET_ALL}")
+        print(f"\n{warning_sth}Suggestions:{Style.RESET_ALL}")
         for match in matches:
             # Calculate similarity score (simplified)
             similarity = sum(a == b for a, b in zip(command, match)) / max(len(command), len(match))
             similarity_bar = "█" * int(similarity * 10)
-            print(f"{suggestion_sct}  {match:<20} {description_sct}- {command_suggestions[match]}")
-            print(f"{relevance_sct}  Relevance: {similarity_bar:<10} {int(similarity * 100)}%")
+            print(f"{suggestion_sth}  {match:<20} {description_sth}- {command_suggestions[match]}")
+            print(f"{relevance_sth}  Relevance: {similarity_bar:<10} {int(similarity * 100)}%")
     
         # Show quick-use hint for the best match
-        print(f"\n{description_sct}Type {success_sct}{matches[0]}{Style.RESET_ALL}")
+        print(f"\n{description_sth}Type {success_sth}{matches[0]}{Style.RESET_ALL}")
 
 def get_command_with_history():
     """Handle input with command history and tab completion"""
     current_input = ""
     cursor_pos = 0
     history_pos = len(COMMAND_HISTORY)
-    prompt = f"{prompt_sct}SigmaOS {description_sct}> "
+    prompt = f"{prompt_sth}SigmaOS {description_sth}> "
     
     def refresh_line(text, cursor):
         # Move to start of line and clear to end
@@ -743,7 +747,7 @@ def get_command_with_history():
                 # Show multiple completions
                 print()
                 for comp in completions:
-                    print(f"{suggestion_sct}  {comp}{Style.RESET_ALL}")
+                    print(f"{suggestion_sth}  {comp}{Style.RESET_ALL}")
                 print()
         
         elif key == readchar.key.UP:
@@ -808,21 +812,21 @@ def show_splash_screen():
     print(splash_text)
     
     # Check and install required libraries
-    print(f"{info_sct}Checking dependencies...{Style.RESET_ALL}")
+    print(f"{info_sth}Checking dependencies...{Style.RESET_ALL}")
     for lib, pip_name in required_libraries.items():
         if pip_name != 'Built-in':
             try:
                 __import__(lib)
-                print(f"{success_sct}✓ {lib}{Style.RESET_ALL}")
+                print(f"{success_sth}✓ {lib}{Style.RESET_ALL}")
             except ImportError:
-                print(f"{warning_sct}Installing {lib}...{Style.RESET_ALL}")
+                print(f"{warning_sth}Installing {lib}...{Style.RESET_ALL}")
                 loading_animation(f"Installing {lib}", task=lambda: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
                                    stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL))
-                print(f"{success_sct}✓ {lib} installed{Style.RESET_ALL}")
+                print(f"{success_sth}✓ {lib} installed{Style.RESET_ALL}")
 
     # Get system information
-    print(f"\n{info_sct}Detecting system information...{Style.RESET_ALL}")
+    print(f"\n{info_sth}Detecting system information...{Style.RESET_ALL}")
     
     try:
         if platform.system() == "Windows":
@@ -871,21 +875,43 @@ def show_splash_screen():
     # Show final system information
     clear_screen()
     print(splash_text)
-    print(f"{info_sct}CPU:{description_sct} {cpu}")
-    print(f"{info_sct}GPU:{description_sct} {gpu}")
-    print(f"{info_sct}Memory:{description_sct} {total_memory}GB")
+    print(f"{info_sth}CPU:{description_sth} {cpu}")
+    print(f"{info_sth}GPU:{description_sth} {gpu}")
+    print(f"{info_sth}Memory:{description_sth} {total_memory}GB")
     time.sleep(3)  # Brief pause to show system info
     clear_screen()
 
 def system_info():
     """Display system information"""
-    print(f"\n{info_sct}System Information:{Style.RESET_ALL}")
-    print(f"{warning_sct}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
-    print(f"{warning_sct}CPU: {psutil.cpu_count(logical=False)} cores")
-    print(f"{warning_sct}Logical CPUs: {psutil.cpu_count(logical=True)}")
-    print(f"{warning_sct}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
-    print(f"{warning_sct}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
-    print(f"{warning_sct}Python Version: {platform.python_version()}")
+    print(f"\n{info_sth}System Information:{Style.RESET_ALL}")
+    print(f"{warning_sth}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
+    print(f"{warning_sth}CPU: {psutil.cpu_count(logical=False)} cores")
+    print(f"{warning_sth}Logical CPUs: {psutil.cpu_count(logical=True)}")
+    print(f"{warning_sth}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
+    print(f"{warning_sth}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
+    print(f"{warning_sth}Python Version: {platform.python_version()}")
+
+def log(message):
+    """
+    Logs a message to a file in the /logs directory.
+    Uses a single log file per SigmaOS session.
+    The log file is named SigmaOS_{Start_Time}.log
+    """
+    global LOG_FILE
+    
+    # Prepare logs directory path
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Create log file if it doesn't exist
+    if LOG_FILE is None:
+        start_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        LOG_FILE = os.path.join(logs_dir, f"SigmaOS_{start_time}.log")
+    
+    # Write the log message
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{timestamp}] {message}\n")
 
 def interactive_shell():
     # Exit if we're a subprocess instance
@@ -945,7 +971,7 @@ def interactive_shell():
                     loading_animation("Shutting down SigmaOS")
                     sys.exit(0)
                 else:
-                    print(f"{error_sct}Unknown command: {command}{Style.RESET_ALL}")
+                    print(f"{error_sth}Unknown command: {command}{Style.RESET_ALL}")
             
             elif main_command == "setup":
                 setup_essential_packages()
@@ -964,15 +990,15 @@ def interactive_shell():
                     elif subcommand == "uninstall" and len(args) == 2:
                         uninstall_package(args[1])
                     else:
-                        print(f"{error_sct}Unknown command for ligma.{Style.RESET_ALL}")
+                        print(f"{error_sth}Unknown command for ligma.{Style.RESET_ALL}")
                 else:
-                    print(f"{warning_sct}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
+                    print(f"{warning_sth}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
             
             elif main_command == "sysinfo":
                 system_info()
 
             elif main_command == "now":
-                print(f"{info_sct}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
+                print(f"{info_sth}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
             
             elif main_command == "sendlogs":
                 send_logs_to_discord()
@@ -984,21 +1010,21 @@ def interactive_shell():
                         unit = args[1].lower()
                         if unit in ["s", "sec", "seconds"]:
                             time.sleep(duration)
-                            print(f"{success_sct}Timer finished!{Style.RESET_ALL}")
+                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
                         elif unit in ["m", "min", "minutes"]:
                             time.sleep(duration * 60)
-                            print(f"{success_sct}Timer finished!{Style.RESET_ALL}")
+                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
                         elif unit in ["h", "hr", "hours"]:
                             time.sleep(duration * 3600)
-                            print(f"{success_sct}Timer finished!{Style.RESET_ALL}")
+                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
                         else:
-                            print(f"{error_sct}Invalid time unit. Use s, m, or h.{Style.RESET_ALL}")
+                            print(f"{error_sth}Invalid time unit. Use s, m, or h.{Style.RESET_ALL}")
                     except ValueError:
-                        print(f"{error_sct}Invalid duration. Please enter a number.{Style.RESET_ALL}")
+                        print(f"{error_sth}Invalid duration. Please enter a number.{Style.RESET_ALL}")
                 else:
-                    print(f"{warning_sct}Usage: timer <duration> <unit (s/m/h)>{Style.RESET_ALL}")
-                    print(f"{info_sct}Pro tip: You can type a command during the timer (you won't see it)")
-                    print(f"{info_sct}and press Enter to execute it when the timer finishes!{Style.RESET_ALL}")
+                    print(f"{warning_sth}Usage: timer <duration> <unit (s/m/h)>{Style.RESET_ALL}")
+                    print(f"{info_sth}Pro tip: You can type a command during the timer (you won't see it)")
+                    print(f"{info_sth}and press Enter to execute it when the timer finishes!{Style.RESET_ALL}")
 
             elif main_command == "rick":
                 subprocess.run(["curl", "ascii.live/rick"])
@@ -1013,17 +1039,17 @@ def interactive_shell():
                 elif args[0] == "remove" and len(args) == 2:
                     remove_alias(args[1])
                 else:
-                    print(f"{warning_sct}Usage: alias: list | add <name> <command> | remove <name>{Style.RESET_ALL}")
+                    print(f"{warning_sth}Usage: alias: list | add <name> <command> | remove <name>{Style.RESET_ALL}")
 
             elif is_valid_package(main_command):
                 run_package(main_command)
             
             else:
-                print(f"{error_sct}Unknown command: {main_command}. Try 'help' for available commands.{Style.RESET_ALL}")
+                print(f"{error_sth}Unknown command: {main_command}. Try 'help' for available commands.{Style.RESET_ALL}")
                 suggest_command(main_command)  # Suggest similar commands
 
         except KeyboardInterrupt:
-            print(f"\n{error_sct}Interrupted!{Style.RESET_ALL}")
+            print(f"\n{error_sth}Interrupted!{Style.RESET_ALL}")
             loading_animation("Shutting down SigmaOS")
             sys.exit(0)  # Use sys.exit here too
 
