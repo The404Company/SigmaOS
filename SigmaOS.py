@@ -8,9 +8,112 @@ from colorama import init, Fore, Back, Style
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
-THEME_FILE = "theme.sth"
-VERSION = "0.1.5"
+THEMES_DIR = "themes"
+USER_SETTINGS_FILE = "user.sigs"
+VERSION = "0.1.6"
 LOG_FILE = None
+
+def load_user_settings():
+    """Load user settings from user.sigs file"""
+    if not os.path.exists(USER_SETTINGS_FILE):
+        return {"theme": "default"}
+    try:
+        with open(USER_SETTINGS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading user settings: {e}")
+        return {"theme": "default"}
+
+def save_user_settings(settings):
+    """Save user settings to user.sigs file"""
+    with open(USER_SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=4)
+
+def get_current_theme():
+    """Get the current theme name from user settings"""
+    settings = load_user_settings()
+    return settings.get("theme", "default")
+
+def set_theme(theme_name):
+    """Set the current theme in user settings"""
+    settings = load_user_settings()
+    settings["theme"] = theme_name
+    save_user_settings(settings)
+    print(f"{success_sth}Theme set to {theme_name}. Please restart SigmaOS to apply changes.{Style.RESET_ALL}")
+
+def list_themes():
+    """List all available themes"""
+    if not os.path.exists(THEMES_DIR):
+        os.makedirs(THEMES_DIR)
+        # Create default theme if it doesn't exist
+        default_theme = {
+            "banner_sth": "cyan",
+            "version_sth": "yellow",
+            "success_sth": "green",
+            "error_sth": "red",
+            "warning_sth": "yellow",
+            "info_sth": "cyan",
+            "header_sth": "yellow",
+            "command_sth": "green",
+            "description_sth": "white",
+            "author_sth": "cyan",
+            "loading_sth": "cyan",
+            "prompt_sth": "green",
+            "suggestion_sth": "cyan",
+            "relevance_sth": "blue",
+            "system_info_sth": "yellow",
+            "timer_sth": "green",
+            "alias_sth": "green",
+            "package_sth": "green",
+            "package_version_sth": "cyan",
+            "package_author_sth": "cyan",
+            "package_description_sth": "white",
+            "package_installed_sth": "green",
+            "package_not_installed_sth": "yellow",
+            "package_error_sth": "red",
+            "package_loading_sth": "cyan",
+            "package_skipped_sth": "yellow",
+            "package_cleanup_sth": "green",
+            "package_download_sth": "cyan",
+            "package_install_sth": "cyan",
+            "package_uninstall_sth": "yellow",
+            "package_reset_sth": "red",
+            "package_setup_sth": "cyan",
+            "package_essential_sth": "green",
+            "package_already_installed_sth": "yellow",
+            "package_not_found_sth": "red",
+            "package_download_error_sth": "red",
+            "package_install_error_sth": "red",
+            "package_uninstall_error_sth": "red",
+            "package_reset_error_sth": "red",
+            "package_setup_error_sth": "red",
+            "package_essential_error_sth": "red",
+            "package_already_installed_error_sth": "red",
+            "package_not_found_error_sth": "red",
+            "package_download_success_sth": "green",
+            "package_install_success_sth": "green",
+            "package_uninstall_success_sth": "green",
+            "package_reset_success_sth": "green",
+            "package_setup_success_sth": "green",
+            "package_essential_success_sth": "green",
+            "package_already_installed_success_sth": "green",
+            "package_not_found_success_sth": "green"
+        }
+        with open(os.path.join(THEMES_DIR, "default.sth"), 'w') as f:
+            json.dump(default_theme, f, indent=4)
+
+    themes = [f[:-4] for f in os.listdir(THEMES_DIR) if f.endswith('.sth')]
+    current_theme = get_current_theme()
+    
+    if themes:
+        print(f"\n{header_sth}Available themes:{Style.RESET_ALL}")
+        for theme in themes:
+            if theme == current_theme:
+                print(f"{success_sth}  {theme} (current){Style.RESET_ALL}")
+            else:
+                print(f"{description_sth}  {theme}")
+    else:
+        print(f"{warning_sth}No themes found.{Style.RESET_ALL}")
 
 class Theme:
     def __init__(self):
@@ -20,11 +123,24 @@ class Theme:
     
     def load_theme(self):
         """Load theme from file or create default if it doesn't exist"""
-        if not os.path.exists(THEME_FILE):
-            self.create_default_theme()
+        if not os.path.exists(THEMES_DIR):
+            os.makedirs(THEMES_DIR)
+        
+        theme_name = get_current_theme()
+        theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+        
+        if not os.path.exists(theme_file):
+            # If theme file doesn't exist, copy default theme
+            default_theme = os.path.join(THEMES_DIR, "default.sth")
+            if os.path.exists(default_theme):
+                with open(default_theme, 'r') as src, open(theme_file, 'w') as dst:
+                    dst.write(src.read())
+            else:
+                self.create_default_theme()
+                return
         
         try:
-            with open(THEME_FILE, 'r') as f:
+            with open(theme_file, 'r') as f:
                 self.theme = json.load(f)
         except Exception as e:
             print(f"Error loading theme: {e}")
@@ -92,7 +208,8 @@ class Theme:
             "package_not_found_success_sth": "green"
         }
         
-        with open(THEME_FILE, 'w') as f:
+        default_theme_file = os.path.join(THEMES_DIR, "default.sth")
+        with open(default_theme_file, 'w') as f:
             json.dump(default_theme, f, indent=4)
         self.theme = default_theme
 
@@ -143,6 +260,7 @@ ALL_COMMANDS = {
     'now': [],
     'sendlogs': [],
     'timer': [],
+    'theme': ['list', 'set'],
 }
 
 init(autoreset=True)  # Initialize colorama
@@ -244,6 +362,8 @@ def show_help():
         ("now", "Show current date and time"),
         ("sendlogs", "Send logs to Discord"),
         ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
+        ("theme list", "List available themes"),
+        ("theme set <name>", "Set theme (requires restart)"),
         ]
     for cmd, desc in system_commands:
         print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
@@ -599,13 +719,20 @@ def uninstall_package(package_name):
         return False
 
 def run_package(package_name):
-    package_dir = os.path.join(PACKAGES_DIR, package_name, "main.py")
+    # Check if the command uses dot notation (e.g., "package.file")
+    if '.' in package_name:
+        package_name, file_name = package_name.split('.', 1)
+        file_name = f"{file_name}.py"
+    else:
+        file_name = "main.py"
+
+    package_dir = os.path.join(PACKAGES_DIR, package_name, file_name)
 
     if not os.path.exists(package_dir):
-        print(f"{error_sth}main.py not found in {package_name}.{Style.RESET_ALL}")
+        print(f"{error_sth}{file_name} not found in {package_name}.{Style.RESET_ALL}")
         return False
 
-    print(f"{info_sth}Running {package_name}/main.py...{Style.RESET_ALL}")
+    print(f"{info_sth}Running {package_name}/{file_name}...{Style.RESET_ALL}")
     # Pass any additional arguments after the package name
     args = [sys.executable, package_dir] + sys.argv[2:]
     
@@ -622,7 +749,13 @@ def run_package(package_name):
     return True
 
 def is_valid_package(package_name):
-    return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
+    # Check if the command uses dot notation
+    if '.' in package_name:
+        package_name, file_name = package_name.split('.', 1)
+        file_name = f"{file_name}.py"
+        return os.path.exists(os.path.join(PACKAGES_DIR, package_name, file_name))
+    else:
+        return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
 
 def show_welcome_message():
     if not os.path.exists(PACKAGES_DIR) or not os.listdir(PACKAGES_DIR):
@@ -653,6 +786,8 @@ def suggest_command(command):
         "now": "Show current date and time",
         "sendlogs": "Send logs to Discord",
         "alias remove": "Remove existing alias",
+        "theme list": "List available themes",
+        "theme set": "Set theme",
         "sigma help": "Show help menu",
         "sigma quit": "Exit SigmaOS"
     }
@@ -973,6 +1108,21 @@ def interactive_shell():
                 else:
                     print(f"{error_sth}Unknown command: {command}{Style.RESET_ALL}")
             
+            elif main_command == "theme":
+                if not args:
+                    list_themes()
+                elif args[0] == "list":
+                    list_themes()
+                elif args[0] == "set" and len(args) == 2:
+                    theme_name = args[1]
+                    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+                    if os.path.exists(theme_file):
+                        set_theme(theme_name)
+                    else:
+                        print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+                else:
+                    print(f"{warning_sth}Usage: theme: list | set <name>{Style.RESET_ALL}")
+
             elif main_command == "setup":
                 setup_essential_packages()
             
