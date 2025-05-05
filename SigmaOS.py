@@ -10,7 +10,7 @@ PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
 THEMES_DIR = "themes"
 USER_SETTINGS_FILE = "user.sigs"
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 LOG_FILE = None
 
 def load_user_settings():
@@ -155,57 +155,36 @@ class Theme:
     def create_default_theme(self):
         """Create default theme file"""
         default_theme = {
-            "banner_sth": "cyan",
-            "version_sth": "yellow",
-            "success_sth": "green",
-            "error_sth": "red",
-            "warning_sth": "yellow",
-            "info_sth": "cyan",
-            "header_sth": "yellow",
-            "command_sth": "green",
-            "description_sth": "white",
-            "author_sth": "cyan",
-            "loading_sth": "cyan",
-            "prompt_sth": "green",
-            "suggestion_sth": "cyan",
-            "relevance_sth": "blue",
-            "system_info_sth": "yellow",
-            "timer_sth": "green",
-            "alias_sth": "green",
-            "package_sth": "green",
-            "package_version_sth": "cyan",
-            "package_author_sth": "cyan",
-            "package_description_sth": "white",
-            "package_installed_sth": "green",
-            "package_not_installed_sth": "yellow",
-            "package_error_sth": "red",
-            "package_loading_sth": "cyan",
-            "package_skipped_sth": "yellow",
-            "package_cleanup_sth": "green",
-            "package_download_sth": "cyan",
-            "package_install_sth": "cyan",
-            "package_uninstall_sth": "yellow",
-            "package_reset_sth": "red",
-            "package_setup_sth": "cyan",
-            "package_essential_sth": "green",
-            "package_already_installed_sth": "yellow",
-            "package_not_found_sth": "red",
-            "package_download_error_sth": "red",
-            "package_install_error_sth": "red",
-            "package_uninstall_error_sth": "red",
-            "package_reset_error_sth": "red",
-            "package_setup_error_sth": "red",
-            "package_essential_error_sth": "red",
-            "package_already_installed_error_sth": "red",
-            "package_not_found_error_sth": "red",
-            "package_download_success_sth": "green",
-            "package_install_success_sth": "green",
-            "package_uninstall_success_sth": "green",
-            "package_reset_success_sth": "green",
-            "package_setup_success_sth": "green",
-            "package_essential_success_sth": "green",
-            "package_already_installed_success_sth": "green",
-            "package_not_found_success_sth": "green"
+            # Core UI Elements
+            "banner_sth": "cyan",          # Banner box and lines
+            "command_sth": "green",        # Commands, sigma symbol, and SigmaOS text
+            "version_sth": "yellow",       # Version number
+            "description_sth": "white",    # General text and descriptions
+            
+            # Status Messages
+            "success_sth": "green",        # Success messages
+            "error_sth": "red",            # Error messages
+            "warning_sth": "yellow",       # Warning messages
+            "info_sth": "cyan",            # Information messages
+            
+            # UI Components
+            "header_sth": "yellow",        # Section headers
+            "prompt_sth": "green",         # Command prompt
+            "loading_sth": "cyan",         # Loading animations
+            "timer_sth": "green",          # Timer display
+            
+            # Interactive Elements
+            "suggestion_sth": "cyan",      # Command suggestions
+            "relevance_sth": "blue",       # Suggestion relevance
+            "alias_sth": "green",          # Alias commands
+            
+            # System Information
+            "system_info_sth": "yellow",   # System information
+            
+            # Package Management
+            "package_sth": "green",        # Package names
+            "package_status_sth": "cyan",  # Package status (installed, version, etc.)
+            "package_error_sth": "red"     # Package errors
         }
         
         default_theme_file = os.path.join(THEMES_DIR, "default.sth")
@@ -260,7 +239,7 @@ ALL_COMMANDS = {
     'now': [],
     'sendlogs': [],
     'timer': [],
-    'theme': ['list', 'set'],
+    'theme': ['list', 'set', 'edit', 'create', 'delete', 'show'],
 }
 
 init(autoreset=True)  # Initialize colorama
@@ -271,9 +250,9 @@ def clear_screen():
 def show_banner():
     clear_screen()
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"{banner_sth}╔═════════════════════════╗")
-    print(f"║ {command_sth}σ SigmaOS {version_sth}v{VERSION}{description_sth}        ║")
-    print(f"╚═════════════════════════╝{Style.RESET_ALL}")
+    print(f"{banner_sth}╔═════════════════════════╗{Style.RESET_ALL}")
+    print(f"{banner_sth}║ {Style.RESET_ALL}{command_sth}σ{Style.RESET_ALL} {command_sth}SigmaOS{Style.RESET_ALL} {version_sth}v{VERSION}{Style.RESET_ALL}        {banner_sth}║{Style.RESET_ALL}")
+    print(f"{banner_sth}╚═════════════════════════╝{Style.RESET_ALL}")
 
 def loading_animation(message, duration=2, task=None):
     """
@@ -362,11 +341,23 @@ def show_help():
         ("now", "Show current date and time"),
         ("sendlogs", "Send logs to Discord"),
         ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
-        ("theme list", "List available themes"),
-        ("theme set <name>", "Set theme (requires restart)"),
         ]
     for cmd, desc in system_commands:
         print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
+
+    # Theme Management
+    print(f"\n{info_sth}Theme Management:{Style.RESET_ALL}")
+    theme_commands = [
+        ("theme list", "List all available themes"),
+        ("theme set <name>", "Set theme (requires restart)"),
+        ("theme edit <name> [value]", "Edit theme colors (all or specific value)"),
+        ("theme create <name>", "Create a new theme"),
+        ("theme delete <name>", "Delete a theme"),
+        ("theme show <name>", "Show theme contents"),
+        ]
+    for cmd, desc in theme_commands:
+        print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
+    print(f"{description_sth}  Available colors: black, blue, cyan, green, magenta, red, white, yellow, lightblack_ex, lightblue_ex, lightcyan_ex, lightgreen_ex, lightmagenta_ex, lightred_ex, lightwhite_ex, lightyellow_ex{Style.RESET_ALL}")
 
     # Package Management
     print(f"\n{info_sth}Package Management:{Style.RESET_ALL}")
@@ -623,8 +614,8 @@ def list_packages():
                 if i > 0:  # Add empty line before each package except the first one
                     print()
                 desc = get_package_description(pkg)
-                print(f"{package_installed_sth}{pkg} {description_sth}- {desc['description']}")
-                print(f"{package_version_sth}{desc['author']} {description_sth}- v{desc['version']}")
+                print(f"{package_sth}{pkg} {description_sth}- {desc['description']}")
+                print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
                 packages_found = True
         
         # Show available but not installed packages
@@ -636,7 +627,7 @@ def list_packages():
                     print()
                 desc = get_package_description(pkg, installed=False)
                 print(f"{description_sth}{pkg} - {desc['description']}")
-                print(f"{package_version_sth}{desc['author']} - v{desc['version']}")
+                print(f"{package_status_sth}{desc['author']} - v{desc['version']}")
                 packages_found = True
         
         if not packages_found:
@@ -1019,12 +1010,12 @@ def show_splash_screen():
 def system_info():
     """Display system information"""
     print(f"\n{info_sth}System Information:{Style.RESET_ALL}")
-    print(f"{warning_sth}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
-    print(f"{warning_sth}CPU: {psutil.cpu_count(logical=False)} cores")
-    print(f"{warning_sth}Logical CPUs: {psutil.cpu_count(logical=True)}")
-    print(f"{warning_sth}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
-    print(f"{warning_sth}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
-    print(f"{warning_sth}Python Version: {platform.python_version()}")
+    print(f"{system_info_sth}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
+    print(f"{system_info_sth}CPU: {psutil.cpu_count(logical=False)} cores")
+    print(f"{system_info_sth}Logical CPUs: {psutil.cpu_count(logical=True)}")
+    print(f"{system_info_sth}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
+    print(f"{system_info_sth}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
+    print(f"{system_info_sth}Python Version: {platform.python_version()}")
 
 def log(message):
     """
@@ -1047,6 +1038,114 @@ def log(message):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"[{timestamp}] {message}\n")
+
+def edit_theme(theme_name, value_name=None):
+    """Edit a theme file"""
+    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+    if not os.path.exists(theme_file):
+        print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+        return
+    
+    try:
+        with open(theme_file, 'r') as f:
+            theme_data = json.load(f)
+        
+        print(f"\n{header_sth}Editing theme: {theme_name}{Style.RESET_ALL}")
+        print(f"{description_sth}Available colors: black, blue, cyan, green, magenta, red, white, yellow, lightblack_ex, lightblue_ex, lightcyan_ex, lightgreen_ex, lightmagenta_ex, lightred_ex, lightwhite_ex, lightyellow_ex{Style.RESET_ALL}")
+        
+        if value_name:
+            if value_name not in theme_data:
+                print(f"{error_sth}Value '{value_name}' not found in theme.{Style.RESET_ALL}")
+                return
+            
+            current_value = theme_data[value_name]
+            new_value = input(f"{prompt_sth}{value_name} ({current_value}): {Style.RESET_ALL}").strip()
+            if new_value:
+                theme_data[value_name] = new_value
+        else:
+            # Group theme values by category
+            categories = {
+                "Core UI Elements": ["banner_sth", "command_sth", "version_sth", "description_sth"],
+                "Status Messages": ["success_sth", "error_sth", "warning_sth", "info_sth"],
+                "UI Components": ["header_sth", "prompt_sth", "loading_sth", "timer_sth"],
+                "Interactive Elements": ["suggestion_sth", "relevance_sth", "alias_sth"],
+                "System Information": ["system_info_sth"],
+                "Package Management": ["package_sth", "package_status_sth", "package_error_sth"]
+            }
+            
+            for category, values in categories.items():
+                print(f"\n{header_sth}{category}:{Style.RESET_ALL}")
+                for key in values:
+                    if key in theme_data:
+                        current_value = theme_data[key]
+                        new_value = input(f"{prompt_sth}{key} ({current_value}): {Style.RESET_ALL}").strip()
+                        if new_value:
+                            theme_data[key] = new_value
+        
+        with open(theme_file, 'w') as f:
+            json.dump(theme_data, f, indent=4)
+        print(f"{success_sth}Theme '{theme_name}' updated successfully.{Style.RESET_ALL}")
+    except Exception as e:
+        print(f"{error_sth}Error editing theme: {e}{Style.RESET_ALL}")
+
+def create_theme(theme_name):
+    """Create a new theme file"""
+    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+    if os.path.exists(theme_file):
+        print(f"{error_sth}Theme '{theme_name}' already exists.{Style.RESET_ALL}")
+        return
+    
+    try:
+        # Copy default theme as base
+        default_theme = os.path.join(THEMES_DIR, "default.sth")
+        if os.path.exists(default_theme):
+            with open(default_theme, 'r') as src, open(theme_file, 'w') as dst:
+                dst.write(src.read())
+        else:
+            # Create new theme with default values
+            theme = Theme()
+            theme.create_default_theme()
+            with open(theme_file, 'w') as f:
+                json.dump(theme.theme, f, indent=4)
+        
+        print(f"{success_sth}Theme '{theme_name}' created successfully.{Style.RESET_ALL}")
+        print(f"{info_sth}Use 'theme edit {theme_name}' to customize the theme.{Style.RESET_ALL}")
+    except Exception as e:
+        print(f"{error_sth}Error creating theme: {e}{Style.RESET_ALL}")
+
+def delete_theme(theme_name):
+    """Delete a theme file"""
+    if theme_name == "default":
+        print(f"{error_sth}Cannot delete the default theme.{Style.RESET_ALL}")
+        return
+    
+    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+    if not os.path.exists(theme_file):
+        print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+        return
+    
+    try:
+        os.remove(theme_file)
+        print(f"{success_sth}Theme '{theme_name}' deleted successfully.{Style.RESET_ALL}")
+    except Exception as e:
+        print(f"{error_sth}Error deleting theme: {e}{Style.RESET_ALL}")
+
+def show_theme(theme_name):
+    """Show the contents of a theme file"""
+    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+    if not os.path.exists(theme_file):
+        print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+        return
+    
+    try:
+        with open(theme_file, 'r') as f:
+            theme_data = json.load(f)
+        
+        print(f"\n{header_sth}Theme: {theme_name}{Style.RESET_ALL}")
+        for key, value in theme_data.items():
+            print(f"{command_sth}{key}: {description_sth}{value}")
+    except Exception as e:
+        print(f"{error_sth}Error showing theme: {e}{Style.RESET_ALL}")
 
 def interactive_shell():
     # Exit if we're a subprocess instance
@@ -1120,8 +1219,21 @@ def interactive_shell():
                         set_theme(theme_name)
                     else:
                         print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+                elif args[0] == "edit":
+                    if len(args) == 2:
+                        edit_theme(args[1])
+                    elif len(args) == 3:
+                        edit_theme(args[1], args[2])
+                    else:
+                        print(f"{warning_sth}Usage: theme edit <name> [value_name]{Style.RESET_ALL}")
+                elif args[0] == "create" and len(args) == 2:
+                    create_theme(args[1])
+                elif args[0] == "delete" and len(args) == 2:
+                    delete_theme(args[1])
+                elif args[0] == "show" and len(args) == 2:
+                    show_theme(args[1])
                 else:
-                    print(f"{warning_sth}Usage: theme: list | set <name>{Style.RESET_ALL}")
+                    print(f"{warning_sth}Usage: theme: list | set <name> | edit <name> [value_name] | create <name> | delete <name> | show <name>{Style.RESET_ALL}")
 
             elif main_command == "setup":
                 setup_essential_packages()
