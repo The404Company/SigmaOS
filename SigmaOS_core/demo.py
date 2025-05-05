@@ -1,4 +1,4 @@
-from SigmaOS_core import clear_screen, press_enter_to_continue, loading_animation
+from SigmaOS_core import *
 from colorama import *
 import time
 
@@ -11,6 +11,10 @@ def main():
     # Clear the screen at start
     clear_screen()
     
+    press_enter_to_continue()
+
+    suck("https://raw.githubusercontent.com/The404Company/The404Company.github.io/refs/heads/main/T404C_logo.png", save_to_documents=True, filename="i_just_downnloaded_this.png", hidden=False)
+
     # Show simple loading animation
     print("Demonstrating simple loading animation:")
     loading_animation("Loading resources", duration=3)
