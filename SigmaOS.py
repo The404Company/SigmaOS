@@ -10,7 +10,7 @@ PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
 THEMES_DIR = "themes"
 USER_SETTINGS_FILE = "user.sigs"
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 LOG_FILE = None
 
 def load_user_settings():
@@ -232,9 +232,8 @@ ALL_COMMANDS = {
     'clear': [],
     'setup': [],
     'reset': [],
-    'ligma': ['list', 'install', 'uninstall'],  # Added uninstall
+    'ligma': ['list', 'install', 'uninstall'],
     'alias': ['list', 'add', 'remove'],
-    'sigma': ['help', 'quit'],
     'sysinfo': [],
     'now': [],
     'sendlogs': [],
@@ -710,22 +709,41 @@ def uninstall_package(package_name):
         return False
 
 def run_package(package_name):
-    # Check if the command uses dot notation (e.g., "package.file")
-    if '.' in package_name:
-        package_name, file_name = package_name.split('.', 1)
-        file_name = f"{file_name}.py"
+    # Parse the package path with dot notation
+    parts = package_name.split('.')
+    base_package = parts[0]
+    
+    # Handle different path formats
+    if len(parts) == 1:
+        # Default case: just the package name, run main.py
+        file_path = os.path.join(PACKAGES_DIR, base_package, "main.py")
     else:
-        file_name = "main.py"
+        # Nested case: handle arbitrary depth
+        if len(parts) == 2:
+            # Legacy format: package.file runs package/file.py
+            file_path = os.path.join(PACKAGES_DIR, parts[0], f"{parts[1]}.py")
+        else:
+            # New format: package.dir1.dir2.file runs package/dir1/dir2/file.py
+            # Last part is the file name, all others are directory components
+            file_name = parts[-1]
+            path_components = parts[:-1]
+            file_path = os.path.join(PACKAGES_DIR, *path_components, f"{file_name}.py")
 
-    package_dir = os.path.join(PACKAGES_DIR, package_name, file_name)
-
-    if not os.path.exists(package_dir):
-        print(f"{error_sth}{file_name} not found in {package_name}.{Style.RESET_ALL}")
+    if not os.path.exists(file_path):
+        print(f"{error_sth}File not found: {file_path}{Style.RESET_ALL}")
         return False
 
-    print(f"{info_sth}Running {package_name}/{file_name}...{Style.RESET_ALL}")
-    # Pass any additional arguments after the package name
-    args = [sys.executable, package_dir] + sys.argv[2:]
+    print(f"{info_sth}Running {file_path}...{Style.RESET_ALL}")
+    
+    # Get additional arguments from sys.argv if we're receiving them directly, 
+    # otherwise we need to get them from somewhere else
+    args = None
+    if isinstance(sys.argv, list) and len(sys.argv) > 1 and sys.argv[0] == package_name:
+        # If sys.argv was set to 'parts' earlier, use the proper arguments
+        args = [sys.executable, file_path] + sys.argv[1:]
+    else:
+        # Fallback for compatibility
+        args = [sys.executable, file_path]
     
     # Set environment variable to prevent recursive shell instances
     env = os.environ.copy()
@@ -740,13 +758,27 @@ def run_package(package_name):
     return True
 
 def is_valid_package(package_name):
-    # Check if the command uses dot notation
-    if '.' in package_name:
-        package_name, file_name = package_name.split('.', 1)
-        file_name = f"{file_name}.py"
-        return os.path.exists(os.path.join(PACKAGES_DIR, package_name, file_name))
+    # Parse the package path with dot notation
+    parts = package_name.split('.')
+    base_package = parts[0]
+    
+    # Check if the base package directory exists
+    base_package_dir = os.path.join(PACKAGES_DIR, base_package)
+    if not os.path.exists(base_package_dir):
+        return False
+    
+    # Handle different path formats
+    if len(parts) == 1:
+        # Just the package name, check if main.py exists
+        return os.path.exists(os.path.join(base_package_dir, "main.py"))
+    elif len(parts) == 2:
+        # package.file format, check if file.py exists
+        return os.path.exists(os.path.join(base_package_dir, f"{parts[1]}.py"))
     else:
-        return os.path.exists(os.path.join(PACKAGES_DIR, package_name, "main.py"))
+        # Nested format: check if the nested file exists
+        file_name = parts[-1]
+        path_components = parts[:-1]
+        return os.path.exists(os.path.join(PACKAGES_DIR, *path_components, f"{file_name}.py"))
 
 def show_welcome_message():
     if not os.path.exists(PACKAGES_DIR) or not os.listdir(PACKAGES_DIR):
@@ -779,8 +811,10 @@ def suggest_command(command):
         "alias remove": "Remove existing alias",
         "theme list": "List available themes",
         "theme set": "Set theme",
-        "sigma help": "Show help menu",
-        "sigma quit": "Exit SigmaOS"
+        "theme edit": "Edit theme colors",
+        "theme create": "Create a new theme",
+        "theme delete": "Delete a theme",
+        "theme show": "Show theme contents"
     }
 
     # Get close matches for the command
@@ -1160,22 +1194,145 @@ def interactive_shell():
     show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
     aliases = load_aliases()
     
+    # Define command handlers
+    def handle_help():
+        show_help()
+    
+    def handle_exit():
+        loading_animation("Shutting down SigmaOS", duration=.5)
+        sys.exit(0)
+    
+    def handle_clear():
+        show_banner()
+    
+    def handle_setup():
+        setup_essential_packages()
+    
+    def handle_reset():
+        reset_sigmaos()
+        show_banner()
+    
+    def handle_ligma(args):
+        if args:
+            subcommand = args[0]
+            if subcommand == "list":
+                list_packages()
+            elif subcommand == "install" and len(args) == 2:
+                download_package(args[1])
+            elif subcommand == "uninstall" and len(args) == 2:
+                uninstall_package(args[1])
+            else:
+                print(f"{error_sth}Unknown command for ligma.{Style.RESET_ALL}")
+        else:
+            print(f"{warning_sth}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
+    
+    def handle_alias(args):
+        if not args:
+            list_aliases()
+        elif args[0] == "list":
+            list_aliases()
+        elif args[0] == "add" and len(args) >= 3:
+            add_alias(args[1], " ".join(args[2:]))
+        elif args[0] == "remove" and len(args) == 2:
+            remove_alias(args[1])
+        else:
+            print(f"{warning_sth}Usage: alias: list | add <name> <command> | remove <name>{Style.RESET_ALL}")
+    
+    def handle_sysinfo():
+        system_info()
+    
+    def handle_now():
+        print(f"{info_sth}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
+    
+    def handle_sendlogs():
+        send_logs_to_discord()
+    
+    def handle_timer(args):
+        if args and len(args) == 2:
+            try:
+                duration = int(args[0])
+                unit = args[1].lower()
+                if unit in ["s", "sec", "seconds"]:
+                    time.sleep(duration)
+                    print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
+                elif unit in ["m", "min", "minutes"]:
+                    time.sleep(duration * 60)
+                    print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
+                elif unit in ["h", "hr", "hours"]:
+                    time.sleep(duration * 3600)
+                    print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
+                else:
+                    print(f"{error_sth}Invalid time unit. Use s, m, or h.{Style.RESET_ALL}")
+            except ValueError:
+                print(f"{error_sth}Invalid duration. Please enter a number.{Style.RESET_ALL}")
+        else:
+            print(f"{warning_sth}Usage: timer <duration> <unit (s/m/h)>{Style.RESET_ALL}")
+            print(f"{info_sth}Pro tip: You can type a command during the timer (you won't see it)")
+            print(f"{info_sth}and press Enter to execute it when the timer finishes!{Style.RESET_ALL}")
+    
+    def handle_rick():
+        subprocess.run(["curl", "ascii.live/rick"])
+    
+    def handle_theme(args):
+        if not args:
+            list_themes()
+        elif args[0] == "list":
+            list_themes()
+        elif args[0] == "set" and len(args) == 2:
+            theme_name = args[1]
+            theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
+            if os.path.exists(theme_file):
+                set_theme(theme_name)
+            else:
+                print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
+        elif args[0] == "edit":
+            if len(args) == 2:
+                edit_theme(args[1])
+            elif len(args) == 3:
+                edit_theme(args[1], args[2])
+            else:
+                print(f"{warning_sth}Usage: theme edit <name> [value_name]{Style.RESET_ALL}")
+        elif args[0] == "create" and len(args) == 2:
+            create_theme(args[1])
+        elif args[0] == "delete" and len(args) == 2:
+            delete_theme(args[1])
+        elif args[0] == "show" and len(args) == 2:
+            show_theme(args[1])
+        else:
+            print(f"{warning_sth}Usage: theme: list | set <name> | edit <name> [value_name] | create <name> | delete <name> | show <name>{Style.RESET_ALL}")
+    
+    # Command mapping dictionary - remove 'sigma' command
+    command_handlers = {
+        "help": handle_help,
+        "exit": handle_exit,
+        "clear": handle_clear,
+        "setup": handle_setup,
+        "reset": handle_reset,
+        "ligma": handle_ligma,
+        "alias": handle_alias,
+        "sysinfo": handle_sysinfo,
+        "now": handle_now,
+        "sendlogs": handle_sendlogs,
+        "timer": handle_timer,
+        "rick": handle_rick,
+        "theme": handle_theme
+    }
+    
     while True:
         try:
             command = get_command_with_history()  # Replace input() with our new function
 
-            if command.lower() in ["exit", "sigma quit"]:
-                loading_animation("Shutting down SigmaOS")
-                sys.exit(0)  # Use sys.exit for definitive exit
+            if not command.strip():
+                continue
 
             # Split command into parts
             parts = command.split()
             
-            # Handle package calls with arguments (e.g. "yapper test.txt" (bad example))
+            # Handle package calls with arguments (e.g. "yapper test.txt")
             if parts and is_valid_package(parts[0]):
-                sys.argv = parts  # Set sys.argv to include command arguments
+                # Store the original arguments
+                sys.argv = parts.copy()  # Make a copy so the original parts list isn't affected
                 run_package(parts[0])
-                show_banner()  # Refresh banner after package execution
                 continue
 
             # Check if command is an alias
@@ -1184,128 +1341,25 @@ def interactive_shell():
                 if len(parts) > 1:
                     command += " " + " ".join(parts[1:])
                 parts = command.split()
-                if command.lower() in ["exit", "sigma quit"]:  # Check if alias resolves to exit
-                    loading_animation("Shutting down SigmaOS")
-                    sys.exit(0)
 
             main_command = parts[0].lower() if parts else ""
-            args = parts[1:]
+            args = parts[1:] if len(parts) > 1 else []
 
-            if not parts:
+            # Special case for exit command
+            if main_command == "exit":
+                handle_exit()
                 continue
 
-            if main_command == "clear":
-                show_banner()
-                continue
-
-            if main_command in ["help", "sigma", "sigmaos"]:
-                if not args or (main_command in ["sigma", "sigmaos"] and args[0] == "help"):
-                    show_help()
-                elif main_command == "sigma" and args[0] == "quit":
-                    loading_animation("Shutting down SigmaOS")
-                    sys.exit(0)
+            # Check for command in handlers dictionary
+            if main_command in command_handlers:
+                if main_command in ["help", "exit", "clear", "setup", "reset", "sysinfo", "now", "sendlogs", "rick"]:
+                    # Commands without arguments
+                    command_handlers[main_command]()
                 else:
-                    print(f"{error_sth}Unknown command: {command}{Style.RESET_ALL}")
-            
-            elif main_command == "theme":
-                if not args:
-                    list_themes()
-                elif args[0] == "list":
-                    list_themes()
-                elif args[0] == "set" and len(args) == 2:
-                    theme_name = args[1]
-                    theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
-                    if os.path.exists(theme_file):
-                        set_theme(theme_name)
-                    else:
-                        print(f"{error_sth}Theme '{theme_name}' not found.{Style.RESET_ALL}")
-                elif args[0] == "edit":
-                    if len(args) == 2:
-                        edit_theme(args[1])
-                    elif len(args) == 3:
-                        edit_theme(args[1], args[2])
-                    else:
-                        print(f"{warning_sth}Usage: theme edit <name> [value_name]{Style.RESET_ALL}")
-                elif args[0] == "create" and len(args) == 2:
-                    create_theme(args[1])
-                elif args[0] == "delete" and len(args) == 2:
-                    delete_theme(args[1])
-                elif args[0] == "show" and len(args) == 2:
-                    show_theme(args[1])
-                else:
-                    print(f"{warning_sth}Usage: theme: list | set <name> | edit <name> [value_name] | create <name> | delete <name> | show <name>{Style.RESET_ALL}")
-
-            elif main_command == "setup":
-                setup_essential_packages()
-            
-            elif main_command == "reset":
-                reset_sigmaos()
-                show_banner()
-            
-            elif main_command == "ligma":
-                if args:
-                    subcommand = args[0]
-                    if subcommand == "list":
-                        list_packages()
-                    elif subcommand == "install" and len(args) == 2:
-                        download_package(args[1])
-                    elif subcommand == "uninstall" and len(args) == 2:
-                        uninstall_package(args[1])
-                    else:
-                        print(f"{error_sth}Unknown command for ligma.{Style.RESET_ALL}")
-                else:
-                    print(f"{warning_sth}Usage: ligma: list | install <package> | uninstall <package>{Style.RESET_ALL}")
-            
-            elif main_command == "sysinfo":
-                system_info()
-
-            elif main_command == "now":
-                print(f"{info_sth}Current time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Style.RESET_ALL}")
-            
-            elif main_command == "sendlogs":
-                send_logs_to_discord()
-
-            elif main_command == "timer":
-                if args and len(args) == 2:
-                    try:
-                        duration = int(args[0])
-                        unit = args[1].lower()
-                        if unit in ["s", "sec", "seconds"]:
-                            time.sleep(duration)
-                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
-                        elif unit in ["m", "min", "minutes"]:
-                            time.sleep(duration * 60)
-                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
-                        elif unit in ["h", "hr", "hours"]:
-                            time.sleep(duration * 3600)
-                            print(f"{success_sth}Timer finished!{Style.RESET_ALL}")
-                        else:
-                            print(f"{error_sth}Invalid time unit. Use s, m, or h.{Style.RESET_ALL}")
-                    except ValueError:
-                        print(f"{error_sth}Invalid duration. Please enter a number.{Style.RESET_ALL}")
-                else:
-                    print(f"{warning_sth}Usage: timer <duration> <unit (s/m/h)>{Style.RESET_ALL}")
-                    print(f"{info_sth}Pro tip: You can type a command during the timer (you won't see it)")
-                    print(f"{info_sth}and press Enter to execute it when the timer finishes!{Style.RESET_ALL}")
-
-            elif main_command == "rick":
-                subprocess.run(["curl", "ascii.live/rick"])
-
-            elif main_command == "alias":
-                if not args:
-                    list_aliases()
-                elif args[0] == "list":
-                    list_aliases()
-                elif args[0] == "add" and len(args) >= 3:
-                    add_alias(args[1], " ".join(args[2:]))
-                elif args[0] == "remove" and len(args) == 2:
-                    remove_alias(args[1])
-                else:
-                    print(f"{warning_sth}Usage: alias: list | add <name> <command> | remove <name>{Style.RESET_ALL}")
-
+                    # Commands that take arguments
+                    command_handlers[main_command](args)
             elif is_valid_package(main_command):
                 run_package(main_command)
-            
             else:
                 print(f"{error_sth}Unknown command: {main_command}. Try 'help' for available commands.{Style.RESET_ALL}")
                 suggest_command(main_command)  # Suggest similar commands
