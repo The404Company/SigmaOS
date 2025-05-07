@@ -8,9 +8,10 @@ import threading
 import json
 import platform
 import importlib.util
+import uuid
 
 # Version number
-VERSION = "0.1.8"  # 0.1.8.4
+VERSION = "0.1.9"
 # Define basic console colors for early use before colorama is loaded
 try:
     # First try to import colorama for basic styling
@@ -31,6 +32,85 @@ except ImportError:
     INFO_STYLE = ""
     RESET_STYLE = ""
 
+# Global variable for log file
+LOG_FILE = None
+
+# Enhanced logging system
+def log(message, level="INFO", print_to_console=False, traceback=None):
+    """
+    Enhanced logging function that writes messages to a log file and optionally to the console.
+    
+    Args:
+        message (str): The message to log
+        level (str): Log level: "INFO", "WARNING", "ERROR", "DEBUG"
+        print_to_console (bool): Whether to also print the message to the console
+        traceback (Exception): Exception object to include traceback information
+    
+    Returns:
+        None
+    """
+    global LOG_FILE
+    
+    # Prepare logs directory path
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Create log file if it doesn't exist
+    if LOG_FILE is None:
+        start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+        LOG_FILE = os.path.join(logs_dir, f"SigmaOS_{start_time}.log")
+    
+    # Format the message with timestamp and level
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_message = f"[{timestamp}] [{level}] {message}"
+    
+    # Add traceback information if provided
+    if traceback is not None:
+        import traceback as tb
+        trace_info = "".join(tb.format_exception(type(traceback), traceback, traceback.__traceback__))
+        log_message += f"\nTraceback:\n{trace_info}"
+    
+    # Write to log file
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_message + "\n")
+    except Exception as e:
+        # If we can't write to the log file, at least print to console
+        print(f"{ERROR_STYLE}Error writing to log file: {e}{RESET_STYLE}")
+        print_to_console = True
+    
+    # Print to console if requested
+    if print_to_console:
+        style = {
+            "INFO": INFO_STYLE,
+            "WARNING": WARNING_STYLE,
+            "ERROR": ERROR_STYLE,
+            "DEBUG": INFO_STYLE,
+            "SUCCESS": SUCCESS_STYLE
+        }.get(level, INFO_STYLE)
+        
+        print(f"{style}[{level}] {message}{RESET_STYLE}")
+
+def log_info(message, print_to_console=False):
+    """Log an informational message"""
+    log(message, level="INFO", print_to_console=print_to_console)
+
+def log_warning(message, print_to_console=False):
+    """Log a warning message"""
+    log(message, level="WARNING", print_to_console=print_to_console)
+
+def log_error(message, exception=None, print_to_console=False):
+    """Log an error message with optional exception traceback"""
+    log(message, level="ERROR", print_to_console=print_to_console, traceback=exception)
+
+def log_debug(message, print_to_console=False):
+    """Log a debug message"""
+    log(message, level="DEBUG", print_to_console=print_to_console)
+
+def log_success(message, print_to_console=False):
+    """Log a success message"""
+    log(message, level="SUCCESS", print_to_console=print_to_console)
+
 # Safe module import function
 def safe_import(module_name):
     """Safely import a module and return None if it's not available"""
@@ -43,6 +123,7 @@ def safe_import(module_name):
 USING_PYTHON_312_PLUS = sys.version_info >= (3, 12)
 if USING_PYTHON_312_PLUS and platform.system() == "Linux":
     print(f"{WARNING_STYLE}Running on Python 3.12+ on Linux. Some features may be limited.{RESET_STYLE}")
+    log_warning("Running on Python 3.12+ on Linux. Some features may be limited.")
 
 def clear_screen():
     """Clear the console screen"""
@@ -235,7 +316,7 @@ def install_dependencies():
                 )
                 print(f"✓ {dep} installed successfully")
         except Exception as e:
-            print(f"× Error installing {dep}: {e}")
+            print(f"{ERROR_STYLE}Error installing {dep}: {e}")
             if platform.system() == "Linux":
                 print(f"{WARNING_STYLE}Please manually install the missing dependencies:{RESET_STYLE}")
                 print(f"python3 -m pip install --break-system-packages {' '.join(missing_deps)}")
@@ -268,7 +349,6 @@ import readchar
 import psutil
 import platform
 import math
-import uuid
 import datetime
 from zipfile import ZipFile
 
@@ -288,7 +368,6 @@ PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
 THEMES_DIR = "themes"
 USER_SETTINGS_FILE = "user.sigs"
-LOG_FILE = None
 
 def load_user_settings():
     """Load user settings from user.sigs file"""
@@ -645,10 +724,6 @@ def show_help():
 
     print(f"\n{header_sth}╚{'═' * 41}╝{RESET_STYLE}")
 
-import uuid
-import os
-import json
-
 def get_user_uuid():
     """Get or create a unique, anonymized UUID for the user."""
     uuid_file = os.path.join(os.path.dirname(__file__), "user_uuid.json")
@@ -669,22 +744,29 @@ def get_user_uuid():
 def send_logs_to_discord():
     """
     Sends all log files in the 'logs' folder to a Discord webhook,
-    then deletes the log files.
+    then deletes the log files. Filters out INFO level logs to reduce noise.
     """
     logs_dir = os.path.join(os.path.dirname(__file__), "logs")
     webhook_url = "https://discord.com/api/webhooks/1366094221714653244/U5O-2im9BovXLdscZZmsrxpnqRBiB9sdgVQJfJphSzIywGChitvdBeXl70fPvoQ228BX" # pls do not spam :)
 
     if not os.path.exists(logs_dir):
         print(f"{WARNING_STYLE}No logs directory found.{RESET_STYLE}")
+        log_warning("No logs directory found when trying to send logs")
         return
 
     log_files = [f for f in os.listdir(logs_dir) if f.endswith(".log")]
     if not log_files:
         print(f"{WARNING_STYLE}No log files to send.{RESET_STYLE}")
+        log_warning("No log files found when trying to send logs")
         return
 
     # Get user UUID
-    user_uuid = get_user_uuid()
+    try:
+        user_uuid = get_user_uuid()
+        log_info(f"Sending logs with UUID: {user_uuid}")
+    except Exception as e:
+        user_uuid = str(uuid.uuid4())  # Fallback to a new UUID
+        log_error(f"Error getting user UUID, using a temporary one", exception=e)
 
     # Ask for confirmation
     print(f"\n{WARNING_STYLE}Warning: External packages might include personal data in logs.{RESET_STYLE}")
@@ -692,45 +774,97 @@ def send_logs_to_discord():
     confirm = input().strip().lower()
     if confirm != 'y' and confirm != '':
         print(f"{ERROR_STYLE}Log sending cancelled.{RESET_STYLE}")
+        log_warning("Log sending cancelled by user")
         return
 
     message = f"User UUID: {user_uuid}\n"
+    log_info(f"Preparing {len(log_files)} log files to send")
+    
+    # Track which files were successfully processed
+    processed_files = []
+    filtered_log_count = 0
+    
     for log_file in log_files:
         log_path = os.path.join(logs_dir, log_file)
         try:
             with open(log_path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-            message += f"\n{log_file}:\n{content}\n"
+                # Read all lines from the log file
+                lines = f.readlines()
+                
+                # Filter out INFO logs, keep ERROR, WARNING, etc.
+                filtered_lines = []
+                for line in lines:
+                    # Check if this is an INFO log entry
+                    if "[INFO]" not in line:
+                        filtered_lines.append(line)
+                    else:
+                        filtered_log_count += 1
+                
+                # Join the filtered lines back together
+                filtered_content = "".join(filtered_lines).strip()
+                
+                # Only add this file to the message if it has content after filtering
+                if filtered_content:
+                    message += f"\n{log_file} (filtered):\n{filtered_content}\n"
+                    processed_files.append(log_file)
+                    log_debug(f"Added {log_file} to message (filtered {filtered_log_count} INFO logs)")
+                else:
+                    log_debug(f"Skipped {log_file} - only contained INFO logs")
+                    processed_files.append(log_file)  # Still mark as processed for deletion
+                
         except Exception as e:
             print(f"{ERROR_STYLE}Error reading {log_file}: {e}{RESET_STYLE}")
+            log_error(f"Error reading log file {log_file}", exception=e)
 
     if not message.strip():
-        print(f"{WARNING_STYLE}No log content to send.{RESET_STYLE}")
+        print(f"{WARNING_STYLE}No important log content to send after filtering INFO logs.{RESET_STYLE}")
+        log_warning("No non-INFO logs to send after filtering")
         return
 
     # Discord message limit is 2000 characters, so chunk if needed
     max_length = 1900  # leave room for formatting
     messages = [message[i:i+max_length] for i in range(0, len(message), max_length)]
+    log_info(f"Splitting log content into {len(messages)} messages (filtered out {filtered_log_count} INFO logs)")
 
-    for msg in messages:
-        data = {"content": msg}
-        response = requests.post(webhook_url, json=data)
-        if response.status_code == 204 or response.status_code == 200:
-            print(f"{SUCCESS_STYLE}Logs sent to Discord webhook.{RESET_STYLE}")
-        else:
-            print(f"{ERROR_STYLE}Failed to send logs: {response.status_code} {response.text}{RESET_STYLE}")
-
-    # Delete log files after sending
-    for log_file in log_files:
+    success = True
+    for i, msg in enumerate(messages):
         try:
-            os.remove(os.path.join(logs_dir, log_file))
+            data = {"content": msg}
+            response = requests.post(webhook_url, json=data)
+            if response.status_code == 204 or response.status_code == 200:
+                log_info(f"Sent message chunk {i+1}/{len(messages)} to Discord")
+            else:
+                print(f"{ERROR_STYLE}Failed to send message chunk {i+1}: {response.status_code} {response.text}{RESET_STYLE}")
+                log_error(f"Failed to send message chunk {i+1}: {response.status_code} {response.text}")
+                success = False
+                break
         except Exception as e:
-            print(f"{ERROR_STYLE}Error deleting {log_file}: {e}{RESET_STYLE}")
+            print(f"{ERROR_STYLE}Error sending logs to Discord: {e}{RESET_STYLE}")
+            log_error(f"Error sending logs to Discord", exception=e)
+            success = False
+            break
+
+    if success:
+        print(f"{SUCCESS_STYLE}Important logs sent to Discord webhook (filtered out {filtered_log_count} INFO logs).{RESET_STYLE}")
+        log_info("Important logs successfully sent to Discord")
+
+        # Delete log files after sending
+        for log_file in processed_files:
+            try:
+                os.remove(os.path.join(logs_dir, log_file))
+                log_debug(f"Deleted log file {log_file}")
+            except Exception as e:
+                print(f"{ERROR_STYLE}Error deleting {log_file}: {e}{RESET_STYLE}")
+                log_error(f"Error deleting log file {log_file}", exception=e)
+    else:
+        print(f"{WARNING_STYLE}Not all logs were sent successfully. Keeping log files.{RESET_STYLE}")
+        log_warning("Not all logs were sent successfully, keeping log files")
 
 def setup_essential_packages():
     essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
     
     print(f"\n{INFO_STYLE}Installing essential packages...{RESET_STYLE}")
+    log_info("Starting setup of essential packages")
     print(f"{description_sth}The following packages will be installed:{RESET_STYLE}")
     for pkg in essential_packages:
         print(f"{command_sth}  ▶ {pkg}")
@@ -738,23 +872,57 @@ def setup_essential_packages():
     confirm = input(f"\n{WARNING_STYLE}Do you want to proceed? (y/N): {RESET_STYLE}")
     if confirm.lower() != 'y':
         print(f"{ERROR_STYLE}Setup cancelled.{RESET_STYLE}")
+        log_warning("Setup of essential packages cancelled by user")
         return
+    
+    log_info(f"Installing {len(essential_packages)} essential packages: {', '.join(essential_packages)}")
+    
+    installed_count = 0
+    failed_packages = []
     
     for pkg in essential_packages:
         try:
             if not is_valid_package(pkg):
                 print(f"\n{INFO_STYLE}Installing {pkg}...{RESET_STYLE}")
+                log_info(f"Installing essential package: {pkg}")
                 download_package(pkg)
+                
+                # Verify installation was successful
+                if is_valid_package(pkg):
+                    installed_count += 1
+                    log_success(f"Essential package {pkg} installed successfully")
+                else:
+                    failed_packages.append(pkg)
+                    log_error(f"Failed to install essential package {pkg}")
             else:
                 print(f"{WARNING_STYLE}Package {pkg} is already installed.{RESET_STYLE}")
+                log_info(f"Essential package {pkg} is already installed")
+                installed_count += 1
         except Exception as e:
             print(f"{ERROR_STYLE}Error installing {pkg}: {e}{RESET_STYLE}")
+            log_error(f"Error installing essential package {pkg}", exception=e)
+            failed_packages.append(pkg)
     
     # Clean up SigmaOS-packages-main folder after all installations
     sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
     if os.path.exists(sigmamain_dir):
-        shutil.rmtree(sigmamain_dir)
-        print(f"\n{SUCCESS_STYLE}Cleaned up temporary files{RESET_STYLE}")
+        try:
+            shutil.rmtree(sigmamain_dir)
+            print(f"\n{SUCCESS_STYLE}Cleaned up temporary files{RESET_STYLE}")
+            log_info("Cleaned up temporary files after package installation")
+        except Exception as e:
+            print(f"{WARNING_STYLE}Could not clean up temporary files: {e}{RESET_STYLE}")
+            log_error("Could not clean up temporary files", exception=e)
+    
+    # Show summary
+    if installed_count == len(essential_packages):
+        print(f"\n{SUCCESS_STYLE}All essential packages installed successfully!{RESET_STYLE}")
+        log_info("All essential packages installed successfully")
+    else:
+        print(f"\n{WARNING_STYLE}Installed {installed_count} of {len(essential_packages)} essential packages.{RESET_STYLE}")
+        if failed_packages:
+            print(f"{ERROR_STYLE}Failed packages: {', '.join(failed_packages)}{RESET_STYLE}")
+            log_info(f"Partial setup completion. Failed packages: {', '.join(failed_packages)}")
 
 def reset_sigmaos():
     """Reset SigmaOS by removing documents, packages and pycache folders"""
@@ -765,20 +933,51 @@ def reset_sigmaos():
     ]
     
     print(f"\n{WARNING_STYLE}Warning: This will delete all installed packages and documents!{RESET_STYLE}")
+    log_warning("User attempting to reset SigmaOS")
     confirm = input(f"{ERROR_STYLE}Are you sure you want to reset SigmaOS? (y/N): {RESET_STYLE}")
     
     if confirm.lower() != 'y':
         print(f"{SUCCESS_STYLE}Reset cancelled.{RESET_STYLE}")
+        log_warning("SigmaOS reset cancelled by user")
         return
         
+    log_info("Beginning SigmaOS reset procedure")
+    deleted_folders = 0
+    
     for folder in folders_to_delete:
         if os.path.exists(folder):
             try:
-                loading_animation(f"Removed {os.path.basename(folder)}", task=lambda: shutil.rmtree(folder))
+                folder_name = os.path.basename(folder)
+                log_info(f"Removing folder: {folder}")
+                loading_animation(f"Removed {folder_name}", task=lambda folder=folder: shutil.rmtree(folder))
+                deleted_folders += 1
+                log_success(f"Successfully removed {folder}")
+            except PermissionError as e:
+                print(f"{ERROR_STYLE}Permission error removing {folder}. Try closing any applications using it.{RESET_STYLE}")
+                log_error(f"Permission error removing {folder}", exception=e)
             except Exception as e:
                 print(f"{ERROR_STYLE}Error removing {folder}: {e}{RESET_STYLE}")
+                log_error(f"Error removing {folder}", exception=e)
+    
+    # Create a marker file to indicate this is a fresh installation
+    try:
+        # Remove .initialized marker if it exists
+        init_marker = os.path.join(os.path.dirname(__file__), ".initialized")
+        if os.path.exists(init_marker):
+            os.remove(init_marker)
+            log_info("Removed initialization marker file")
+    except Exception as e:
+        log_error("Could not remove initialization marker", exception=e)
     
     print(f"\n{SUCCESS_STYLE}SigmaOS has been reset to default state.{RESET_STYLE}")
+    log_info("SigmaOS reset completed successfully")
+    
+    # Also reset the log file since we're resetting everything
+    global LOG_FILE
+    LOG_FILE = None
+    log_info("Started new log file after reset")
+    
+    print(f"{INFO_STYLE}Run 'setup' to reinstall essential packages.{RESET_STYLE}")
 
 def get_github_file_content(package_name, filename):
     """Fetch raw file content from GitHub"""
@@ -891,59 +1090,97 @@ def list_packages():
 def download_package(package_name):
     if not os.path.exists(PACKAGES_DIR):
         os.makedirs(PACKAGES_DIR)
+        log_info(f"Created packages directory at {PACKAGES_DIR}")
 
     package_dir = os.path.join(PACKAGES_DIR, package_name)
 
     if os.path.exists(package_dir):
         print(f"{WARNING_STYLE}Package {package_name} already downloaded.{RESET_STYLE}")
+        log_warning(f"Package {package_name} already downloaded.")
         return
 
     download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
 
-    loading_animation(f"Downloading {package_name}", task=lambda: requests.get(download_url))
-    zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
-    response = requests.get(download_url)
+    try:
+        loading_animation(f"Downloading {package_name}", task=lambda: requests.get(download_url))
+        zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
+        response = requests.get(download_url)
 
-    if response.status_code == 200:
-        with open(zip_path, "wb") as f:
-            f.write(response.content)
+        if response.status_code == 200:
+            try:
+                with open(zip_path, "wb") as f:
+                    f.write(response.content)
+                log_info(f"Downloaded zip file for {package_name}")
 
-        with ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(PACKAGES_DIR)
+                try:
+                    with ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(PACKAGES_DIR)
+                    log_info(f"Extracted zip file for {package_name}")
 
-        os.remove(zip_path)
-
-        extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main", package_name)
-        if os.path.exists(extracted_folder):
-            if os.path.exists(package_dir):
-                shutil.rmtree(package_dir)
-            os.rename(extracted_folder, package_dir)
-            
-            # Install package requirements
-            desc = get_package_description(package_name)
-            if desc['requirements']:
-                print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
-                core_libs = {"colorama", "requests", "datetime", "json"}
-                for req in desc['requirements']:
-                    if req.lower() in core_libs:
-                        print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
+                    extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main", package_name)
+                    if os.path.exists(extracted_folder):
+                        if os.path.exists(package_dir):
+                            shutil.rmtree(package_dir)
+                        os.rename(extracted_folder, package_dir)
+                        log_info(f"Renamed extracted folder to {package_dir}")
+                        
+                        # Install package requirements
+                        desc = get_package_description(package_name)
+                        if desc['requirements']:
+                            print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
+                            log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
+                            core_libs = {"colorama", "requests", "datetime", "json"}
+                            for req in desc['requirements']:
+                                if req.lower() in core_libs:
+                                    print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
+                                    log_info(f"Skipping requirement {req} (core library)")
+                                else:
+                                    try:
+                                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
+                                            [sys.executable, "-m", "pip", "install", req], 
+                                            stdout=subprocess.DEVNULL, 
+                                            stderr=subprocess.DEVNULL
+                                        ))
+                                        log_info(f"Installed requirement {req}")
+                                    except Exception as e:
+                                        print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
+                                        log_error(f"Error installing requirement {req}", exception=e)
+                        
+                        # Clean up SigmaOS-packages-main folder
+                        sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
+                        if os.path.exists(sigmamain_dir):
+                            loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
+                            log_info("Cleaned up temporary files")
+                        print(f"{SUCCESS_STYLE}Package {package_name} successfully installed.{RESET_STYLE}")
+                        # Remove the duplicated log output that also displays to console
+                        log_info(f"Package {package_name} successfully installed.")
                     else:
-                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run([sys.executable, "-m", "pip", "install", req], 
-                                     stdout=subprocess.DEVNULL, 
-                                     stderr=subprocess.DEVNULL))
-            
-            # Clean up SigmaOS-packages-main folder
-            sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
-            if os.path.exists(sigmamain_dir):
-                loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
-            print(f"{SUCCESS_STYLE}Package {package_name} successfully installed.{RESET_STYLE}")
-            log(f"Package {package_name} successfully installed.")
+                        print(f"{ERROR_STYLE}Package {package_name} not found in downloaded archive.{RESET_STYLE}")
+                        # Remove the duplicated log output that also displays to console
+                        log_info(f"Package {package_name} not found in downloaded archive.")
+                except Exception as extract_error:
+                    print(f"{ERROR_STYLE}Error extracting package: {extract_error}{RESET_STYLE}")
+                    log_error(f"Error extracting package {package_name}", exception=extract_error)
+            except Exception as write_error:
+                print(f"{ERROR_STYLE}Error writing zip file: {write_error}{RESET_STYLE}")
+                log_error(f"Error writing zip file for {package_name}", exception=write_error)
+            finally:
+                # Always clean up the zip file
+                if os.path.exists(zip_path):
+                    try:
+                        os.remove(zip_path)
+                        log_info(f"Removed temporary zip file {zip_path}")
+                    except Exception as cleanup_error:
+                        log_error(f"Error removing temporary zip file", exception=cleanup_error)
         else:
-            print(f"{ERROR_STYLE}Package {package_name} not found in downloaded archive.{RESET_STYLE}")
-            log(f"Package {package_name} not found in downloaded archive.")
-    else:
-        print(f"{ERROR_STYLE}Error downloading package {package_name}.{RESET_STYLE}")
-        log(f"Error downloading package {package_name}.")
+            print(f"{ERROR_STYLE}Error downloading package {package_name}. Status code: {response.status_code}{RESET_STYLE}")
+            log_error(f"Error downloading package {package_name}. Status code: {response.status_code}")
+    except requests.RequestException as req_error:
+        print(f"{ERROR_STYLE}Network error: {req_error}{RESET_STYLE}")
+        log_error(f"Network error downloading package {package_name}", exception=req_error)
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error downloading package {package_name}: {e}{RESET_STYLE}")
+        log_error(f"Error downloading package {package_name}", exception=e)
 
 def uninstall_package(package_name):
     """Uninstall a package by removing its directory"""
@@ -951,14 +1188,23 @@ def uninstall_package(package_name):
     
     if not os.path.exists(package_dir):
         print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
+        log_error(f"Package {package_name} is not installed (uninstall attempt).")
         return False
         
     try:
         print(f"{WARNING_STYLE}Uninstalling {package_name}...{RESET_STYLE}")
+        log_info(f"Uninstalling package {package_name}")
         loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
+        # Don't show redundant success message
+        log_info(f"Package {package_name} successfully uninstalled.")
         return True
+    except PermissionError as e:
+        print(f"{ERROR_STYLE}Permission error uninstalling {package_name}. Try closing any applications using it.{RESET_STYLE}")
+        log_error(f"Permission error uninstalling {package_name}", exception=e)
+        return False
     except Exception as e:
         print(f"{ERROR_STYLE}Error uninstalling {package_name}: {e}{RESET_STYLE}")
+        log_error(f"Error uninstalling {package_name}", exception=e)
         return False
 
 def run_package(package_name):
@@ -984,9 +1230,11 @@ def run_package(package_name):
 
     if not os.path.exists(file_path):
         print(f"{ERROR_STYLE}File not found: {file_path}{RESET_STYLE}")
+        log_error(f"File not found: {file_path}")
         return False
 
     print(f"{INFO_STYLE}Running {file_path}...{RESET_STYLE}")
+    log_info(f"Running package: {package_name} from {file_path}")
     
     # Get additional arguments from sys.argv if we're receiving them directly, 
     # otherwise we need to get them from somewhere else
@@ -994,30 +1242,42 @@ def run_package(package_name):
     if isinstance(sys.argv, list) and len(sys.argv) > 1 and sys.argv[0] == package_name:
         # If sys.argv was set to 'parts' earlier, use the proper arguments
         args = [sys.executable, file_path] + sys.argv[1:]
+        log_debug(f"Running with args: {args}")
     else:
         # Fallback for compatibility
         args = [sys.executable, file_path]
+        log_debug(f"Running with default args: {args}")
     
     # Set environment variable to prevent recursive shell instances
     env = os.environ.copy()
     env['SIGMAOS_SUBPROCESS'] = '1'
     
-    # Only create new shell if not already a subprocess
-    if os.environ.get('SIGMAOS_SUBPROCESS') != '1':
-        if platform.system() == "Windows":
-            subprocess.run(args, env=env)
+    try:
+        # Only create new shell if not already a subprocess
+        if os.environ.get('SIGMAOS_SUBPROCESS') != '1':
+            if platform.system() == "Windows":
+                subprocess.run(args, env=env)
+            else:
+                # On Linux/Mac, use python3 explicitly
+                args[0] = "python3"
+                subprocess.run(args, env=env)
         else:
-            # On Linux/Mac, use python3 explicitly
-            args[0] = "python3"
-            subprocess.run(args, env=env)
-    else:
-        # If we're already a subprocess, run directly without shell
-        if platform.system() == "Windows":
-            subprocess.run(args)
-        else:
-            args[0] = "python3"
-            subprocess.run(args)
-    return True
+            # If we're already a subprocess, run directly without shell
+            if platform.system() == "Windows":
+                subprocess.run(args)
+            else:
+                args[0] = "python3"
+                subprocess.run(args)
+        log_success(f"Package {package_name} executed successfully")
+        return True
+    except subprocess.SubprocessError as e:
+        log_error(f"Error running package {package_name}", exception=e)
+        print(f"{ERROR_STYLE}Error running package: {e}{RESET_STYLE}")
+        return False
+    except Exception as e:
+        log_error(f"Unexpected error running package {package_name}", exception=e)
+        print(f"{ERROR_STYLE}Unexpected error: {e}{RESET_STYLE}")
+        return False
 
 def is_valid_package(package_name):
     # Parse the package path with dot notation
@@ -1344,33 +1604,12 @@ def system_info():
         except:
             pass
 
-def log(message):
-    """
-    Logs a message to a file in the /logs directory.
-    Uses a single log file per SigmaOS session.
-    The log file is named SigmaOS_{Start_Time}.log
-    """
-    global LOG_FILE
-    
-    # Prepare logs directory path
-    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    # Create log file if it doesn't exist
-    if LOG_FILE is None:
-        start_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        LOG_FILE = os.path.join(logs_dir, f"SigmaOS_{start_time}.log")
-    
-    # Write the log message
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{timestamp}] {message}\n")
-
 def edit_theme(theme_name, value_name=None):
     """Edit a theme file"""
     theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
     if not os.path.exists(theme_file):
         print(f"{ERROR_STYLE}Theme '{theme_name}' not found.{RESET_STYLE}")
+        log_error(f"Theme '{theme_name}' not found during edit attempt")
         return
     
     try:
@@ -1383,6 +1622,7 @@ def edit_theme(theme_name, value_name=None):
         if value_name:
             if value_name not in theme_data:
                 print(f"{ERROR_STYLE}Value '{value_name}' not found in theme.{RESET_STYLE}")
+                log_error(f"Value '{value_name}' not found in theme '{theme_name}'")
                 return
             
             current_value = theme_data[value_name]
@@ -1412,14 +1652,17 @@ def edit_theme(theme_name, value_name=None):
         with open(theme_file, 'w') as f:
             json.dump(theme_data, f, indent=4)
         print(f"{SUCCESS_STYLE}Theme '{theme_name}' updated successfully.{RESET_STYLE}")
+        log_success(f"Theme '{theme_name}' updated successfully")
     except Exception as e:
         print(f"{ERROR_STYLE}Error editing theme: {e}{RESET_STYLE}")
+        log_error(f"Error editing theme '{theme_name}'", exception=e)
 
 def create_theme(theme_name):
     """Create a new theme file"""
     theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
     if os.path.exists(theme_file):
         print(f"{ERROR_STYLE}Theme '{theme_name}' already exists.{RESET_STYLE}")
+        log_error(f"Theme '{theme_name}' already exists during creation attempt")
         return
     
     try:
@@ -1437,31 +1680,38 @@ def create_theme(theme_name):
         
         print(f"{SUCCESS_STYLE}Theme '{theme_name}' created successfully.{RESET_STYLE}")
         print(f"{INFO_STYLE}Use 'theme edit {theme_name}' to customize the theme.{RESET_STYLE}")
+        log_success(f"Theme '{theme_name}' created successfully")
     except Exception as e:
         print(f"{ERROR_STYLE}Error creating theme: {e}{RESET_STYLE}")
+        log_error(f"Error creating theme '{theme_name}'", exception=e)
 
 def delete_theme(theme_name):
     """Delete a theme file"""
     if theme_name == "default":
         print(f"{ERROR_STYLE}Cannot delete the default theme.{RESET_STYLE}")
+        log_error(f"Attempted to delete default theme")
         return
     
     theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
     if not os.path.exists(theme_file):
         print(f"{ERROR_STYLE}Theme '{theme_name}' not found.{RESET_STYLE}")
+        log_error(f"Theme '{theme_name}' not found during delete attempt")
         return
     
     try:
         os.remove(theme_file)
         print(f"{SUCCESS_STYLE}Theme '{theme_name}' deleted successfully.{RESET_STYLE}")
+        log_success(f"Theme '{theme_name}' deleted successfully")
     except Exception as e:
         print(f"{ERROR_STYLE}Error deleting theme: {e}{RESET_STYLE}")
+        log_error(f"Error deleting theme '{theme_name}'", exception=e)
 
 def show_theme(theme_name):
     """Show the contents of a theme file"""
     theme_file = os.path.join(THEMES_DIR, f"{theme_name}.sth")
     if not os.path.exists(theme_file):
         print(f"{ERROR_STYLE}Theme '{theme_name}' not found.{RESET_STYLE}")
+        log_error(f"Theme '{theme_name}' not found during show attempt")
         return
     
     try:
@@ -1471,8 +1721,10 @@ def show_theme(theme_name):
         print(f"\n{header_sth}Theme: {theme_name}{RESET_STYLE}")
         for key, value in theme_data.items():
             print(f"{command_sth}{key}: {description_sth}{value}")
+        log_info(f"Displayed theme '{theme_name}'")
     except Exception as e:
         print(f"{ERROR_STYLE}Error showing theme: {e}{RESET_STYLE}")
+        log_error(f"Error showing theme '{theme_name}'", exception=e)
 
 def interactive_shell():
     # Exit if we're a subprocess instance
@@ -1663,4 +1915,16 @@ def interactive_shell():
             sys.exit(0)  # Use sys.exit here too
 
 if __name__ == "__main__":
-    interactive_shell()
+    try:
+        log_info("Starting SigmaOS")
+        interactive_shell()
+    except KeyboardInterrupt:
+        print(f"\n{ERROR_STYLE}Interrupted!{RESET_STYLE}")
+        log_warning("SigmaOS interrupted by user")
+        loading_animation("Shutting down SigmaOS")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n{ERROR_STYLE}Unhandled exception: {e}{RESET_STYLE}")
+        log_error("Unhandled exception in main program", exception=e)
+        print(f"{INFO_STYLE}See logs for more details.{RESET_STYLE}")
+        sys.exit(1)
