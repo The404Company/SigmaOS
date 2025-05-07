@@ -7,9 +7,10 @@ import time
 import threading
 import json
 import platform
+import importlib.util
 
 # Version number
-VERSION = "0.1.8"  # 0.1.8.3
+VERSION = "0.1.8"  # 0.1.8.4
 # Define basic console colors for early use before colorama is loaded
 try:
     # First try to import colorama for basic styling
@@ -29,6 +30,19 @@ except ImportError:
     WARNING_STYLE = ""
     INFO_STYLE = ""
     RESET_STYLE = ""
+
+# Safe module import function
+def safe_import(module_name):
+    """Safely import a module and return None if it's not available"""
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:
+        return None
+
+# Check if we're on Python 3.12+ where distutils is removed
+USING_PYTHON_312_PLUS = sys.version_info >= (3, 12)
+if USING_PYTHON_312_PLUS and platform.system() == "Linux":
+    print(f"{WARNING_STYLE}Running on Python 3.12+ on Linux. Some features may be limited.{RESET_STYLE}")
 
 def clear_screen():
     """Clear the console screen"""
@@ -108,15 +122,22 @@ def show_system_info():
             pass
     elif platform.system() == "Linux":
         try:
-            # Try lspci first
-            output = subprocess.check_output("lspci | grep -i vga", shell=True).decode()
-            if output:
-                gpu = output.split(":")[-1].strip()
-            else:
-                # Fallback to glxinfo
-                output = subprocess.check_output("glxinfo | grep 'OpenGL renderer'", shell=True).decode()
+            # First try lspci
+            try:
+                output = subprocess.check_output("lspci | grep -i vga", shell=True).decode()
                 if output:
                     gpu = output.split(":")[-1].strip()
+            except:
+                pass
+            
+            # Try glxinfo if lspci didn't work
+            if gpu == "Unknown GPU":
+                try:
+                    output = subprocess.check_output("glxinfo | grep 'OpenGL renderer'", shell=True).decode()
+                    if output:
+                        gpu = output.split(":")[-1].strip()
+                except:
+                    pass
         except:
             pass
     
@@ -135,7 +156,6 @@ def install_dependencies():
         'colorama',
         'requests',
         'psutil',
-        'GPUtil',
         'readchar',
         'uuid'
     ]
@@ -149,6 +169,16 @@ def install_dependencies():
         # Only add pygobject if we're not in a headless environment
         if os.environ.get('DISPLAY'):
             dependencies.append('pygobject')  # For GUI support on Linux
+        
+        # Check for newer Python versions (3.12+) where distutils is removed
+        # GPUtil depends on distutils so we'll skip it for newer versions
+        if sys.version_info >= (3, 12):
+            print(f"{WARNING_STYLE}Python 3.12+ detected. Skipping GPUtil installation (incompatible).{RESET_STYLE}")
+        else:
+            dependencies.append('GPUtil')
+    else:
+        # On Windows, always add GPUtil
+        dependencies.append('GPUtil')
     
     # First, check which dependencies are already installed
     missing_deps = []
@@ -236,12 +266,18 @@ from colorama import init, Fore, Back, Style
 import shutil
 import readchar
 import psutil
-import GPUtil
 import platform
 import math
 import uuid
 import datetime
 from zipfile import ZipFile
+
+# Try to import GPUtil safely
+GPUtil = safe_import('GPUtil')
+if GPUtil is None and not USING_PYTHON_312_PLUS:
+    print(f"{WARNING_STYLE}GPUtil module not available. Some GPU features will be limited.{RESET_STYLE}")
+elif GPUtil is None and USING_PYTHON_312_PLUS:
+    print(f"{WARNING_STYLE}GPUtil not supported on Python 3.12+. Using alternative GPU detection.{RESET_STYLE}")
 
 # Initialize colorama
 init(autoreset=True)
@@ -1218,6 +1254,75 @@ def system_info():
     total_disk = disk.total / (1024**3)
     free_disk = disk.free / (1024**3)
     print(f"{system_info_sth}Disk: {total_disk:.1f} GB total ({free_disk:.1f} GB free)")
+    
+    # GPU Information
+    if platform.system() == "Windows":
+        try:
+            # Try to use GPUtil on Windows
+            import GPUtil
+            gpus = GPUtil.getGPUs()
+            if gpus:
+                gpu_names = [gpu.name for gpu in gpus]
+                print(f"{system_info_sth}GPU: {', '.join(gpu_names)}")
+            else:
+                # Fallback to WMI
+                cmd = "wmic path win32_VideoController get name"
+                output = subprocess.check_output(cmd, shell=True).decode()
+                gpu_lines = [line.strip() for line in output.split('\n') if line.strip()]
+                if len(gpu_lines) > 1:
+                    print(f"{system_info_sth}GPU: {gpu_lines[1]}")
+                else:
+                    print(f"{system_info_sth}GPU: Unknown")
+        except ImportError:
+            # If GPUtil is not available, use WMI
+            try:
+                cmd = "wmic path win32_VideoController get name"
+                output = subprocess.check_output(cmd, shell=True).decode()
+                gpu_lines = [line.strip() for line in output.split('\n') if line.strip()]
+                if len(gpu_lines) > 1:
+                    print(f"{system_info_sth}GPU: {gpu_lines[1]}")
+                else:
+                    print(f"{system_info_sth}GPU: Unknown")
+            except:
+                print(f"{system_info_sth}GPU: Unknown")
+    else:
+        # Linux GPU detection
+        try:
+            # Try to use GPUtil first on Linux if available
+            try:
+                import GPUtil
+                gpus = GPUtil.getGPUs()
+                if gpus:
+                    gpu_names = [gpu.name for gpu in gpus]
+                    print(f"{system_info_sth}GPU: {', '.join(gpu_names)}")
+                    return
+            except ImportError:
+                pass  # Continue with alternative methods
+            
+            # Try lspci
+            try:
+                output = subprocess.check_output("lspci | grep -i vga", shell=True).decode()
+                if output:
+                    gpu = output.split(":")[-1].strip()
+                    print(f"{system_info_sth}GPU: {gpu}")
+                    return
+            except:
+                pass
+            
+            # Try glxinfo
+            try:
+                output = subprocess.check_output("glxinfo | grep 'OpenGL renderer'", shell=True).decode()
+                if output:
+                    gpu = output.split(":")[-1].strip()
+                    print(f"{system_info_sth}GPU: {gpu}")
+                    return
+            except:
+                pass
+                
+            # If all else fails
+            print(f"{system_info_sth}GPU: Unknown")
+        except:
+            print(f"{system_info_sth}GPU: Unknown")
     
     # Python Version
     print(f"{system_info_sth}Python: {platform.python_version()}")
