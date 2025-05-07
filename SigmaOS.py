@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 # Define basic console colors for early use before colorama is loaded
 try:
@@ -385,6 +385,28 @@ def load_ligma_module():
         )
         ligma = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(ligma)
+        
+        # Ensure all required functions are available
+        required_functions = [
+            'show_ligma_version',
+            'show_ligma_help',
+            'show_installed_packages',
+            'browse_packages',
+            'search_packages',
+            'download_package',
+            'install_multiple_packages',
+            'uninstall_package',
+            'check_all_updates',
+            'get_package_version',
+            'show_package_info',
+            'update_package'
+        ]
+        
+        for func in required_functions:
+            if not hasattr(ligma, func):
+                print(f"{ERROR_STYLE}Error: ligma module missing required function: {func}{RESET_STYLE}")
+                return None
+                
         return ligma
     except Exception as e:
         print(f"{ERROR_STYLE}Error loading ligma module: {e}{RESET_STYLE}")
@@ -1685,7 +1707,11 @@ def interactive_shell():
                 ligma_module.check_all_updates()
             elif subcommand in ["?v", "?version"]:
                 # Show ligma version
-                ligma_module.show_ligma_version()
+                if hasattr(ligma_module, 'show_ligma_version'):
+                    ligma_module.show_ligma_version()
+                else:
+                    print(f"{ERROR_STYLE}Error: show_ligma_version function not found in ligma module.{RESET_STYLE}")
+                    print(f"{INFO_STYLE}Try running 'update-ligma' to update the ligma module.{RESET_STYLE}")
             elif subcommand in ["?h", "?help"]:
                 ligma_module.show_ligma_help()
             elif len(args) == 2:
