@@ -1,4 +1,4 @@
-# SigmaOS_core v1.2
+# SigmaOS_core v1.3 - i just hope the env stuff wors, i have no idea what i just wrote lol.
 from colorama import Fore, Style
 import os
 import time
@@ -6,6 +6,7 @@ import threading
 import datetime
 import inspect
 import requests
+import json
 from urllib.parse import urlparse
 
 
@@ -144,3 +145,134 @@ def suck(url, save_to_documents=False, filename=None, hidden=False):
         if not hidden:
             print(f"{Fore.RED}Unexpected error: {e}{Style.RESET_ALL}")
         return None
+
+def _get_env_file_path():
+    """Returns the path to the user.env file."""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../user.env"))
+
+def _load_env_vars():
+    """Loads environment variables from the user.env file."""
+    env_path = _get_env_file_path()
+    if not os.path.exists(env_path):
+        return {}
+    
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+            if not content:
+                return {}
+            return json.loads(content)
+    except json.JSONDecodeError:
+        # Only report actual errors
+        print(f"{Fore.RED}Error: user.env file is corrupted.{Style.RESET_ALL}")
+        return {}
+    except Exception as e:
+        print(f"{Fore.RED}Error reading environment variables: {e}{Style.RESET_ALL}")
+        return {}
+
+def _save_env_vars(env_vars):
+    """Saves environment variables to the user.env file."""
+    env_path = _get_env_file_path()
+    env_dir = os.path.dirname(env_path)
+    os.makedirs(env_dir, exist_ok=True)
+    
+    try:
+        with open(env_path, 'w', encoding='utf-8') as f:
+            json.dump(env_vars, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}Error saving environment variables: {e}{Style.RESET_ALL}")
+        return False
+
+def get_env(name, default=None):
+    """
+    Gets an environment variable value.
+    
+    Args:
+        name (str): Name of the environment variable
+        default: Value to return if the variable doesn't exist
+    
+    Returns:
+        Value of the environment variable, or default if not found
+    """
+    env_vars = _load_env_vars()
+    return env_vars.get(name, default)
+
+def set_env(name, value, silent=True):
+    """
+    Sets an environment variable.
+    
+    Args:
+        name (str): Name of the environment variable
+        value: Value to set
+        silent (bool): If True (default), suppresses success messages
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    env_vars = _load_env_vars()
+    env_vars[name] = value
+    success = _save_env_vars(env_vars)
+    
+    if success and not silent:
+        print(f"{Fore.GREEN}Environment variable '{name}' set successfully.{Style.RESET_ALL}")
+    elif not success:
+        # Always show errors
+        print(f"{Fore.RED}Failed to set environment variable '{name}'.{Style.RESET_ALL}")
+    
+    if success:
+        log(f"Environment variable '{name}' set")
+    
+    return success
+
+def delete_env(name, silent=True):
+    """
+    Deletes an environment variable.
+    
+    Args:
+        name (str): Name of the environment variable to delete
+        silent (bool): If True (default), suppresses messages
+    
+    Returns:
+        bool: True if successful and variable existed, False otherwise
+    """
+    env_vars = _load_env_vars()
+    if name not in env_vars:
+        if not silent:
+            print(f"{Fore.YELLOW}Environment variable '{name}' does not exist.{Style.RESET_ALL}")
+        return False
+    
+    del env_vars[name]
+    success = _save_env_vars(env_vars)
+    
+    if success and not silent:
+        print(f"{Fore.GREEN}Environment variable '{name}' deleted successfully.{Style.RESET_ALL}")
+    elif not success:
+        # Always show errors
+        print(f"{Fore.RED}Failed to delete environment variable '{name}'.{Style.RESET_ALL}")
+    
+    if success:
+        log(f"Environment variable '{name}' deleted")
+    
+    return success
+
+def list_env_vars(silent=False):
+    """
+    Lists all environment variables.
+    
+    Args:
+        silent (bool): If True, suppresses all output
+    
+    Returns:
+        dict: Dictionary of all environment variables
+    """
+    env_vars = _load_env_vars()
+    if not silent:
+        if not env_vars:
+            print(f"{Fore.YELLOW}No environment variables found.{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.CYAN}Environment Variables:{Style.RESET_ALL}")
+            for name, value in env_vars.items():
+                print(f"{Fore.GREEN}{name}{Style.RESET_ALL}: {value}")
+    
+    return env_vars

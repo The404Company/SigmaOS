@@ -1,16 +1,191 @@
+#!/usr/bin/env python3
+# Import only built-in libraries first
 import subprocess
 import sys
 import os
+import time
 import threading
 import json
-from colorama import init, Fore, Back, Style
+import platform
 
+# Version number
+VERSION = "0.1.8" # 0.1.8.1
+
+def clear_screen():
+    """Clear the console screen"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def show_text_splash():
+    """Show a simple text splash screen without using any external libraries"""
+    clear_screen()
+    splash_text = f"""
+   _____ _                       ____  _____ 
+  / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
+  \__ \/ / __ `/ __ `__ \/ __ `/ / / /\__ \ 
+ ___/ / / /_/ / / / / / / /_/ / /_/ /___/ / 
+/____/_/\__, /_/ /_/ /_/\__,_/\____//____/   v{VERSION}
+       /____/                               
+                        by The404Company
+
+Installing dependencies...
+"""
+    print(splash_text)
+
+def show_system_info():
+    """Show basic system information using only built-in libraries"""
+    print("\nDetecting system information...")
+    
+    # Get CPU info
+    cpu = "Unknown CPU"
+    if platform.system() == "Windows":
+        try:
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+            cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0]
+            cpu = (cpu.replace("(R)", "")
+                     .replace("(TM)", "")
+                     .replace("CPU ", "")
+                     .replace("Processor", "")
+                     .replace("-Core", "")
+                     .replace("  ", " ")
+                     .strip())
+            if "@" in cpu:
+                cpu = cpu.split("@")[0].strip()
+        except:
+            pass
+    elif platform.system() == "Linux":
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if line.startswith("model name"):
+                        cpu = line.split(":")[1].strip()
+                        break
+        except:
+            pass
+    
+    # Get memory info
+    memory = "Unknown"
+    try:
+        import psutil
+        total_memory = psutil.virtual_memory().total / (1024**3)
+        memory = f"{total_memory:.1f} GB"
+    except:
+        pass
+    
+    # Get GPU info
+    gpu = "Unknown GPU"
+    if platform.system() == "Windows":
+        try:
+            cmd = "wmic path win32_VideoController get name"
+            output = subprocess.check_output(cmd, shell=True).decode()
+            gpu_lines = [line.strip() for line in output.split('\n') if line.strip()]
+            if len(gpu_lines) > 1:
+                gpu = gpu_lines[1]
+                if "AMD" in gpu:
+                    gpu = gpu.replace("AMD ", "AMD Radeon ")
+                elif "NVIDIA" in gpu:
+                    gpu = gpu.replace("NVIDIA GeForce", "NVIDIA")
+        except:
+            pass
+    elif platform.system() == "Linux":
+        try:
+            # Try lspci first
+            output = subprocess.check_output("lspci | grep -i vga", shell=True).decode()
+            if output:
+                gpu = output.split(":")[-1].strip()
+            else:
+                # Fallback to glxinfo
+                output = subprocess.check_output("glxinfo | grep 'OpenGL renderer'", shell=True).decode()
+                if output:
+                    gpu = output.split(":")[-1].strip()
+        except:
+            pass
+    
+    # Display system info
+    print(f"CPU: {cpu}")
+    print(f"GPU: {gpu}")
+    print(f"Memory: {memory}")
+    
+    # Wait for 3 seconds
+    time.sleep(3)
+    clear_screen()
+
+def install_dependencies():
+    """Install all required external libraries"""
+    dependencies = [
+        'colorama',
+        'requests',
+        'psutil',
+        'GPUtil',
+        'readchar',
+        'uuid'
+    ]
+    
+    # Add Linux-specific dependencies
+    if platform.system() == "Linux":
+        dependencies.extend([
+            'distro',  # For better Linux distribution detection
+            'pygobject',  # For GUI support on Linux
+        ])
+    
+    for dep in dependencies:
+        try:
+            __import__(dep)
+            print(f"✓ {dep} already installed")
+        except ImportError:
+            print(f"Installing {dep}...")
+            try:
+                # Use python3 explicitly on Linux
+                python_cmd = "python3" if platform.system() == "Linux" else sys.executable
+                subprocess.check_call(
+                    [python_cmd, "-m", "pip", "install", dep],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                print(f"✓ {dep} installed successfully")
+            except Exception as e:
+                print(f"× Error installing {dep}: {e}")
+                print(f"Please run: pip install {' '.join(dependencies)}")
+                sys.exit(1)
+
+# Check if this is first execution by looking for initialization marker file
+INIT_MARKER = os.path.join(os.path.dirname(__file__), ".initialized")
+
+# Only show splash and install dependencies on first run
+if not os.path.exists(INIT_MARKER):
+    show_text_splash()
+    install_dependencies()
+    show_system_info()  # Show system info for 2 seconds
+    
+    # Create marker file to avoid running setup again
+    try:
+        with open(INIT_MARKER, "w") as f:
+            f.write(f"SigmaOS initialized on {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    except Exception as e:
+        print(f"Warning: Could not create initialization marker: {e}")
+
+# Now import all the libraries
+import requests
+from colorama import init, Fore, Back, Style
+import shutil
+import readchar
+import psutil
+import GPUtil
+import platform
+import math
+import uuid
+import datetime
+from zipfile import ZipFile
+
+# Initialize colorama
+init(autoreset=True)
+
+# Configuration
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
 PACKAGES_DIR = "packages"
 ALIASES_FILE = "aliases.json"
 THEMES_DIR = "themes"
 USER_SETTINGS_FILE = "user.sigs"
-VERSION = "0.1.8"
 LOG_FILE = None
 
 def load_user_settings():
@@ -196,33 +371,12 @@ class Theme:
 theme = Theme()
 
 def ensure_base_libraries():
-    # Install essential libraries needed for the splash screen
-    base_requirements = ['colorama', 'psutil', 'gputil', 'requests', 'readchar', 'datetime', 'uuid']
-    for lib in base_requirements:
-        try:
-            __import__(lib)
-        except ImportError:
-            print(f"Installing required library: {lib}")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
+    # This function is no longer needed as we installed dependencies at startup
+    pass
 
-# Only  run setup if packages directory doesn't exist
+# Only run setup if packages directory doesn't exist
 if not os.path.exists(PACKAGES_DIR):
-    ensure_base_libraries()
-
-# Now we can safely import these
-import requests
-import time
-import datetime
-import json
-from zipfile import ZipFile
-from colorama import init, Fore, Back, Style
-import shutil
-import readchar
-import psutil
-import GPUtil
-import platform
-import math
-
+    pass  # Packages will be set up when needed, dependencies are already installed
 
 COMMAND_HISTORY = []
 MAX_HISTORY = 100
@@ -242,9 +396,6 @@ ALL_COMMANDS = {
 }
 
 init(autoreset=True)  # Initialize colorama
-
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 def show_banner():
     clear_screen()
@@ -751,10 +902,19 @@ def run_package(package_name):
     
     # Only create new shell if not already a subprocess
     if os.environ.get('SIGMAOS_SUBPROCESS') != '1':
-        subprocess.run(args, env=env)
+        if platform.system() == "Windows":
+            subprocess.run(args, env=env)
+        else:
+            # On Linux/Mac, use python3 explicitly
+            args[0] = "python3"
+            subprocess.run(args, env=env)
     else:
         # If we're already a subprocess, run directly without shell
-        subprocess.run(args)
+        if platform.system() == "Windows":
+            subprocess.run(args)
+        else:
+            args[0] = "python3"
+            subprocess.run(args)
     return True
 
 def is_valid_package(package_name):
@@ -935,31 +1095,12 @@ def get_command_with_history():
             cursor_pos += 1
 
 def show_splash_screen():
-    """Display a splash screen and ensure all dependencies are installed"""
-    # List of all required libraries
-    required_libraries = {
-        'requests': 'requests',
-        'colorama': 'colorama',
-        'psutil': 'psutil',
-        'gputil': 'GPUtil',
-        'readchar': 'readchar',
-        'zipfile': 'Built-in',
-        'json': 'Built-in',
-        'uuid': 'uuid',
-        'platform': 'Built-in',
-        'math': 'Built-in',
-        'shutil': 'Built-in',
-        'subprocess': 'Built-in',
-        'datetime': 'Built-in',
-        'sys': 'Built-in',
-        'os': 'Built-in'
-    }
-
-    # Get basic system info first
-    cpu = "Unknown CPU"
-    gpu = "Unknown GPU"
-
-    # Show initial splash text
+    """Display a splash screen with system information"""
+    # Skip splash screen if not first run
+    if os.path.exists(INIT_MARKER):
+        return
+        
+    # Show splash text
     splash_text = f"""
    _____ _                       ____  _____ 
   / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
@@ -967,89 +1108,70 @@ def show_splash_screen():
  ___/ / / /_/ / / / / / / /_/ / /_/ /___/ / 
 /____/_/\__, /_/ /_/ /_/\__,_/\____//____/   v{VERSION}
        /____/                               
+                        by The404Company
 """
     clear_screen()
     print(splash_text)
-    
-    # Check and install required libraries
-    print(f"{info_sth}Checking dependencies...{Style.RESET_ALL}")
-    for lib, pip_name in required_libraries.items():
-        if pip_name != 'Built-in':
-            try:
-                __import__(lib)
-                print(f"{success_sth}✓ {lib}{Style.RESET_ALL}")
-            except ImportError:
-                print(f"{warning_sth}Installing {lib}...{Style.RESET_ALL}")
-                loading_animation(f"Installing {lib}", task=lambda: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
-                                   stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL))
-                print(f"{success_sth}✓ {lib} installed{Style.RESET_ALL}")
-
-    # Get system information
-    print(f"\n{info_sth}Detecting system information...{Style.RESET_ALL}")
-    
-    try:
-        if platform.system() == "Windows":
-            import winreg
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
-            cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0]
-            cpu = (cpu.replace("(R)", "")
-                     .replace("(TM)", "")
-                     .replace("CPU ", "")
-                     .replace("Processor", "")
-                     .replace("-Core", "")
-                     .replace("  ", " ")
-                     .strip())
-            if "@" in cpu:
-                cpu = cpu.split("@")[0].strip()
-    except:
-        pass
-
-    try:
-        gpus = GPUtil.getGPUs()
-        if gpus:
-            gpu = gpus[0].name
-            gpu = (gpu.replace("NVIDIA GeForce", "NVIDIA")
-                     .replace("AMD ", "AMD Radeon ")
-                     .replace("Graphics", "")
-                     .strip())
-        else:
-            if platform.system() == "Windows":
-                try:
-                    cmd = "wmic path win32_VideoController get name"
-                    output = subprocess.check_output(cmd, shell=True).decode()
-                    gpu_lines = [line.strip() for line in output.split('\n') if line.strip()]
-                    if len(gpu_lines) > 1:
-                        gpu = gpu_lines[1]
-                        if "AMD" in gpu:
-                            gpu = gpu.replace("AMD ", "AMD Radeon ")
-                        elif "NVIDIA" in gpu:
-                            gpu = gpu.replace("NVIDIA GeForce", "NVIDIA")
-                except:
-                    pass
-    except:
-        pass
-
-    total_memory = math.ceil(psutil.virtual_memory().total / (1024**3))
-    
-    # Show final system information
-    clear_screen()
-    print(splash_text)
-    print(f"{info_sth}CPU:{description_sth} {cpu}")
-    print(f"{info_sth}GPU:{description_sth} {gpu}")
-    print(f"{info_sth}Memory:{description_sth} {total_memory}GB")
-    time.sleep(3)  # Brief pause to show system info
-    clear_screen()
 
 def system_info():
     """Display system information"""
     print(f"\n{info_sth}System Information:{Style.RESET_ALL}")
-    print(f"{system_info_sth}OS: {platform.system()} {platform.release()} + SigmaOS v{VERSION}")
-    print(f"{system_info_sth}CPU: {psutil.cpu_count(logical=False)} cores")
-    print(f"{system_info_sth}Logical CPUs: {psutil.cpu_count(logical=True)}")
-    print(f"{system_info_sth}Memory: {math.ceil(psutil.virtual_memory().total / (1024**3))} GB")
-    print(f"{system_info_sth}Disk Space: {math.ceil(psutil.disk_usage('/').total / (1024**3))} GB")
-    print(f"{system_info_sth}Python Version: {platform.python_version()}")
+    
+    # OS Information
+    os_name = platform.system()
+    os_version = platform.version()
+    if os_name == "Linux":
+        try:
+            import distro
+            os_name = f"{distro.name()} {distro.version()}"
+        except:
+            try:
+                with open("/etc/os-release", "r") as f:
+                    for line in f:
+                        if line.startswith("PRETTY_NAME="):
+                            os_name = line.split("=")[1].strip().strip('"')
+                            break
+            except:
+                pass
+    
+    print(f"{system_info_sth}OS: {os_name} + SigmaOS v{VERSION}")
+    
+    # CPU Information
+    cpu_count = psutil.cpu_count(logical=False)
+    cpu_logical = psutil.cpu_count(logical=True)
+    print(f"{system_info_sth}CPU: {cpu_count} cores ({cpu_logical} logical)")
+    
+    # Memory Information
+    memory = psutil.virtual_memory()
+    total_memory = memory.total / (1024**3)
+    available_memory = memory.available / (1024**3)
+    print(f"{system_info_sth}Memory: {total_memory:.1f} GB total ({available_memory:.1f} GB available)")
+    
+    # Disk Information
+    disk = psutil.disk_usage('/')
+    total_disk = disk.total / (1024**3)
+    free_disk = disk.free / (1024**3)
+    print(f"{system_info_sth}Disk: {total_disk:.1f} GB total ({free_disk:.1f} GB free)")
+    
+    # Python Version
+    print(f"{system_info_sth}Python: {platform.python_version()}")
+    
+    # Additional Linux-specific information
+    if platform.system() == "Linux":
+        try:
+            # Kernel version
+            kernel = platform.release()
+            print(f"{system_info_sth}Kernel: {kernel}")
+            
+            # Desktop Environment
+            de = os.environ.get('XDG_CURRENT_DESKTOP', os.environ.get('DESKTOP_SESSION', 'Unknown'))
+            print(f"{system_info_sth}Desktop: {de}")
+            
+            # Shell
+            shell = os.environ.get('SHELL', 'Unknown')
+            print(f"{system_info_sth}Shell: {shell}")
+        except:
+            pass
 
 def log(message):
     """
@@ -1186,10 +1308,10 @@ def interactive_shell():
     if os.environ.get('SIGMAOS_SUBPROCESS') == '1':
         return
     
-    # only show splash screen if packages directory doesn't exist
-    if not os.path.exists(PACKAGES_DIR):
+    # Only show splash screen on first execution
+    if not os.path.exists(INIT_MARKER):
         show_splash_screen()
-
+    
     show_banner()
     show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
     aliases = load_aliases()
