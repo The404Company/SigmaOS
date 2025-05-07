@@ -751,6 +751,15 @@ def is_valid_package(package_name):
 
 def check_all_updates():
     """Check for updates for all installed packages"""
+    # Define style variables at the beginning to avoid NameError
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import command_sth, description_sth
+    except ImportError:
+        # Fallback styles
+        command_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        
     installed_packages = []
     if os.path.exists(PACKAGES_DIR):
         installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
@@ -789,15 +798,6 @@ def check_all_updates():
     if not updates_available:
         print(f"{SUCCESS_STYLE}All packages are up to date!{RESET_STYLE}")
         return
-    
-    # Get styling variables
-    try:
-        # Try to get styles from SigmaOS if available
-        from SigmaOS import command_sth, description_sth
-    except ImportError:
-        # Fallback styles
-        command_sth = SUCCESS_STYLE
-        description_sth = RESET_STYLE
     
     # Ask the user which packages to update
     print(f"\n{INFO_STYLE}Updates available for {len(updates_available)} packages:{RESET_STYLE}")
