@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.1.d"
+VERSION = "0.2.0"
 
 # Define basic console colors for early use before colorama is loaded
 try:
@@ -1683,6 +1683,9 @@ def interactive_shell():
             elif subcommand in ["?u", "?update"]:
                 # Check all packages for updates
                 ligma_module.check_all_updates()
+            elif subcommand in ["?v", "?version"]:
+                # Show ligma version
+                ligma_module.show_ligma_version()
             elif subcommand in ["?h", "?help"]:
                 ligma_module.show_ligma_help()
             elif len(args) == 2:

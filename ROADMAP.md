@@ -19,7 +19,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 
 ## 🟡 Short-Term Goals (v0.2.x)
 - [x] **Theme Editor:** Interactive command or package to edit themes from within SigmaOS
-- [ ] **Package Store UI:** Visual browser for available packages (in-terminal)
+- [x] **Improve Ligma** General upgrade of the ligma package-manager
 - [x] **Improved Error Handling:** ~~More helpful error messages and recovery options~~ imporoved logging system inside SigmaOS instead
 - [x] **Better Linux/Mac Support:** Smooth experience across platforms (test and fix edge cases)
 

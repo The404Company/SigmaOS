@@ -4,6 +4,9 @@ Ligma Package Manager for SigmaOS
 This module handles all package management functionality for SigmaOS.
 """
 
+# Ligma package manager version
+VERSION = "1.0.0"
+
 import os
 import sys
 import json
@@ -364,6 +367,18 @@ def browse_packages():
         print(f"{ERROR_STYLE}Error fetching repositories. Status code: {response.status_code}{RESET_STYLE}")
         print(f"{ERROR_STYLE}Response: {response.text}{RESET_STYLE}")
 
+def show_ligma_version():
+    """Display the ligma package manager version"""
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import description_sth
+    except ImportError:
+        # Fallback style
+        description_sth = RESET_STYLE
+        
+    print(f"\n{INFO_STYLE}Ligma Package Manager v{VERSION}{RESET_STYLE}")
+    print(f"{description_sth}The lightweight package manager for SigmaOS{RESET_STYLE}")
+
 def show_ligma_help():
     """Show detailed help for all ligma commands"""
     try:
@@ -423,10 +438,12 @@ def show_ligma_help():
         print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
     
     # Help
-    print(f"\n{INFO_STYLE}Help:{RESET_STYLE}")
+    print(f"\n{INFO_STYLE}Help and Version:{RESET_STYLE}")
     help_commands = [
         ("ligma ?h", "Show this help"),
-        ("ligma ?help", "Show this help")
+        ("ligma ?help", "Show this help"),
+        ("ligma ?v", "Show ligma version"),
+        ("ligma ?version", "Show ligma version")
     ]
     for cmd, desc in help_commands:
         print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
