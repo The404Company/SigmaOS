@@ -9,7 +9,7 @@ import json
 import platform
 
 # Version number
-VERSION = "0.1.8" # 0.1.8.1
+VERSION = "0.1.8" # 0.1.8.2
 
 def clear_screen():
     """Clear the console screen"""
@@ -137,15 +137,58 @@ def install_dependencies():
             try:
                 # Use python3 explicitly on Linux
                 python_cmd = "python3" if platform.system() == "Linux" else sys.executable
-                subprocess.check_call(
-                    [python_cmd, "-m", "pip", "install", dep],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
+                
+                # Check if we're on a Linux system that needs --break-system-packages
+                if platform.system() == "Linux":
+                    try:
+                        # Try to detect if we're on a system that needs --break-system-packages
+                        # This is common on Arch-based systems like EndeavourOS
+                        with open("/etc/os-release", "r") as f:
+                            os_release = f.read().lower()
+                            if "arch" in os_release or "endeavour" in os_release:
+                                print(f"{info_sth}Detected Arch-based system. Using --break-system-packages flag.{Style.RESET_ALL}")
+                                subprocess.check_call(
+                                    [python_cmd, "-m", "pip", "install", "--break-system-packages", dep],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                            else:
+                                subprocess.check_call(
+                                    [python_cmd, "-m", "pip", "install", dep],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                    except:
+                        # If we can't detect the system, try without the flag first
+                        try:
+                            subprocess.check_call(
+                                [python_cmd, "-m", "pip", "install", dep],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL
+                            )
+                        except:
+                            # If that fails, try with the flag
+                            print(f"{info_sth}First attempt failed. Trying with --break-system-packages flag.{Style.RESET_ALL}")
+                            subprocess.check_call(
+                                [python_cmd, "-m", "pip", "install", "--break-system-packages", dep],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL
+                            )
+                else:
+                    # Non-Linux systems use normal installation
+                    subprocess.check_call(
+                        [python_cmd, "-m", "pip", "install", dep],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
                 print(f"✓ {dep} installed successfully")
             except Exception as e:
                 print(f"× Error installing {dep}: {e}")
-                print(f"Please run: pip install {' '.join(dependencies)}")
+                if platform.system() == "Linux":
+                    print(f"{warning_sth}If you're on an Arch-based system (like EndeavourOS), try running:{Style.RESET_ALL}")
+                    print(f"{command_sth}python3 -m pip install --break-system-packages {' '.join(dependencies)}{Style.RESET_ALL}")
+                else:
+                    print(f"{warning_sth}Please run: pip install {' '.join(dependencies)}{Style.RESET_ALL}")
                 sys.exit(1)
 
 # Check if this is first execution by looking for initialization marker file
