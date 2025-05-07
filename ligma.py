@@ -394,6 +394,7 @@ def show_ligma_help():
     print(f"\n{INFO_STYLE}Package Management:{RESET_STYLE}")
     manage_commands = [
         ("ligma install <pkg>", "Install a package"),
+        ("ligma install <pkg1> <pkg2> ?m", "Install multiple packages"),
         ("ligma uninstall <pkg>", "Uninstall a package")
     ]
     for cmd, desc in manage_commands:
@@ -408,6 +409,17 @@ def show_ligma_help():
         ("ligma <pkg> ?info", "Show full package information")
     ]
     for cmd, desc in info_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+    
+    # Updates
+    print(f"\n{INFO_STYLE}Package Updates:{RESET_STYLE}")
+    update_commands = [
+        ("ligma ?u", "Check all packages for updates"),
+        ("ligma ?update", "Check all packages for updates"),
+        ("ligma <pkg> ?u", "Update specific package"),
+        ("ligma <pkg> ?update", "Update specific package")
+    ]
+    for cmd, desc in update_commands:
         print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
     
     # Help
@@ -426,99 +438,327 @@ def list_packages():
     """Redirects to browse_packages for backward compatibility"""
     browse_packages()
 
-def download_package(package_name):
+def download_package(package_name, is_update=False):
+    """
+    Download and install a package
+    
+    Args:
+        package_name (str): Name of the package to download
+        is_update (bool): Whether this is an update operation
+    """
     if not os.path.exists(PACKAGES_DIR):
         os.makedirs(PACKAGES_DIR)
         log_info(f"Created packages directory at {PACKAGES_DIR}")
 
     package_dir = os.path.join(PACKAGES_DIR, package_name)
 
-    if os.path.exists(package_dir):
-        print(f"{WARNING_STYLE}Package {package_name} already downloaded.{RESET_STYLE}")
+    if os.path.exists(package_dir) and not is_update:
+        print(f"{WARNING_STYLE}Package {package_name} already installed. Use 'ligma {package_name} ?update' to update.{RESET_STYLE}")
         log_warning(f"Package {package_name} already downloaded.")
+        return False
+
+    # Delete the package directory if this is an update
+    if is_update and os.path.exists(package_dir):
+        try:
+            shutil.rmtree(package_dir)
+            log_info(f"Removed existing package directory for update: {package_dir}")
+        except Exception as e:
+            print(f"{ERROR_STYLE}Error removing existing package for update: {e}{RESET_STYLE}")
+            log_error(f"Error removing package directory for update", exception=e)
+            return False
+
+    # Direct download URL for the specific package
+    package_url = f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/{package_name}"
+    
+    try:
+        # First get the content listing for the package directory
+        print(f"{INFO_STYLE}Downloading {package_name}...{RESET_STYLE}")
+        headers = {'Accept': 'application/vnd.github.v3+json'}
+        response = requests.get(package_url, headers=headers)
+        
+        if response.status_code != 200:
+            print(f"{ERROR_STYLE}Error getting package files. Status code: {response.status_code}{RESET_STYLE}")
+            log_error(f"Error getting package files. Status code: {response.status_code}")
+            return False
+            
+        files_data = response.json()
+        
+        # Create package directory
+        os.makedirs(package_dir, exist_ok=True)
+        
+        # Download each file in the package
+        download_count = 0
+        error_count = 0
+        
+        for file_info in files_data:
+            if file_info['type'] == 'file':
+                file_name = file_info['name']
+                download_url = file_info['download_url']
+                
+                try:
+                    file_response = requests.get(download_url)
+                    if file_response.status_code == 200:
+                        file_path = os.path.join(package_dir, file_name)
+                        with open(file_path, 'wb') as f:
+                            f.write(file_response.content)
+                        download_count += 1
+                    else:
+                        print(f"{WARNING_STYLE}Error downloading {file_name}: Status code {file_response.status_code}{RESET_STYLE}")
+                        error_count += 1
+                except Exception as e:
+                    print(f"{WARNING_STYLE}Error downloading {file_name}: {e}{RESET_STYLE}")
+                    error_count += 1
+            elif file_info['type'] == 'dir':
+                # Handle subdirectories
+                subdir_name = file_info['name']
+                subdir_path = os.path.join(package_dir, subdir_name)
+                os.makedirs(subdir_path, exist_ok=True)
+                
+                # Get subdirectory contents
+                subdir_url = file_info['url']
+                try:
+                    subdir_response = requests.get(subdir_url, headers=headers)
+                    if subdir_response.status_code == 200:
+                        subdir_files = subdir_response.json()
+                        
+                        for subfile in subdir_files:
+                            if subfile['type'] == 'file':
+                                subfile_name = subfile['name']
+                                subfile_download_url = subfile['download_url']
+                                
+                                try:
+                                    subfile_response = requests.get(subfile_download_url)
+                                    if subfile_response.status_code == 200:
+                                        subfile_path = os.path.join(subdir_path, subfile_name)
+                                        with open(subfile_path, 'wb') as f:
+                                            f.write(subfile_response.content)
+                                        download_count += 1
+                                    else:
+                                        print(f"{WARNING_STYLE}Error downloading {subdir_name}/{subfile_name}: Status code {subfile_response.status_code}{RESET_STYLE}")
+                                        error_count += 1
+                                except Exception as e:
+                                    print(f"{WARNING_STYLE}Error downloading {subdir_name}/{subfile_name}: {e}{RESET_STYLE}")
+                                    error_count += 1
+                    else:
+                        print(f"{WARNING_STYLE}Error getting subdirectory {subdir_name} contents: Status code {subdir_response.status_code}{RESET_STYLE}")
+                except Exception as e:
+                    print(f"{WARNING_STYLE}Error processing subdirectory {subdir_name}: {e}{RESET_STYLE}")
+        
+        # Verify the package has the necessary files
+        if not os.path.exists(os.path.join(package_dir, "main.py")):
+            print(f"{WARNING_STYLE}Warning: main.py not found in package. This package might not be runnable.{RESET_STYLE}")
+        
+        # Install package requirements
+        desc = get_package_description(package_name, installed=True)
+        if desc['requirements']:
+            print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
+            log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
+            core_libs = {"colorama", "requests", "datetime", "json"}
+            for req in desc['requirements']:
+                if req.lower() in core_libs:
+                    print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
+                    log_info(f"Skipping requirement {req} (core library)")
+                else:
+                    try:
+                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
+                            [sys.executable, "-m", "pip", "install", req], 
+                            stdout=subprocess.DEVNULL, 
+                            stderr=subprocess.DEVNULL
+                        ))
+                        log_info(f"Installed requirement {req}")
+                    except Exception as e:
+                        print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
+                        log_error(f"Error installing requirement {req}", exception=e)
+        
+        # Report results
+        if error_count == 0:
+            print(f"{SUCCESS_STYLE}Package {package_name} successfully {'updated' if is_update else 'installed'}.{RESET_STYLE}")
+            log_info(f"Package {package_name} successfully {'updated' if is_update else 'installed'}. Downloaded {download_count} files.")
+            return True
+        else:
+            print(f"{WARNING_STYLE}Package {package_name} {'updated' if is_update else 'installed'} with {error_count} errors. Some functionality may be limited.{RESET_STYLE}")
+            log_warning(f"Package {package_name} {'updated' if is_update else 'installed'} with {error_count} errors.")
+            return True
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error {'updating' if is_update else 'installing'} package {package_name}: {e}{RESET_STYLE}")
+        log_error(f"Error {'updating' if is_update else 'installing'} package {package_name}", exception=e)
+        return False
+
+def install_multiple_packages(package_names):
+    """Install multiple packages at once
+    
+    Args:
+        package_names (list): List of package names to install
+    """
+    if not package_names:
+        print(f"{ERROR_STYLE}No packages specified.{RESET_STYLE}")
         return
 
-    download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
-
-    try:
-        response = loading_animation(f"Downloading {package_name}", task=lambda: requests.get(download_url))
-        zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
-
-        if response.status_code == 200:
-            try:
-                with open(zip_path, "wb") as f:
-                    f.write(response.content)
-                log_info(f"Downloaded zip file for {package_name}")
-
-                try:
-                    with ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(PACKAGES_DIR)
-                    log_info(f"Extracted zip file for {package_name}")
-
-                    extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main", package_name)
-                    if os.path.exists(extracted_folder):
-                        if os.path.exists(package_dir):
-                            shutil.rmtree(package_dir)
-                        os.rename(extracted_folder, package_dir)
-                        log_info(f"Renamed extracted folder to {package_dir}")
-                        
-                        # Install package requirements
-                        desc = get_package_description(package_name)
-                        if desc['requirements']:
-                            print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
-                            log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
-                            core_libs = {"colorama", "requests", "datetime", "json"}
-                            for req in desc['requirements']:
-                                if req.lower() in core_libs:
-                                    print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
-                                    log_info(f"Skipping requirement {req} (core library)")
-                                else:
-                                    try:
-                                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
-                                            [sys.executable, "-m", "pip", "install", req], 
-                                            stdout=subprocess.DEVNULL, 
-                                            stderr=subprocess.DEVNULL
-                                        ))
-                                        log_info(f"Installed requirement {req}")
-                                    except Exception as e:
-                                        print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
-                                        log_error(f"Error installing requirement {req}", exception=e)
-                        
-                        # Clean up SigmaOS-packages-main folder
-                        sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
-                        if os.path.exists(sigmamain_dir):
-                            loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
-                            log_info("Cleaned up temporary files")
-                        print(f"{SUCCESS_STYLE}Package {package_name} successfully installed.{RESET_STYLE}")
-                        # Remove the duplicated log output that also displays to console
-                        log_info(f"Package {package_name} successfully installed.")
-                    else:
-                        print(f"{ERROR_STYLE}Package {package_name} not found in downloaded archive.{RESET_STYLE}")
-                        # Remove the duplicated log output that also displays to console
-                        log_info(f"Package {package_name} not found in downloaded archive.")
-                except Exception as extract_error:
-                    print(f"{ERROR_STYLE}Error extracting package: {extract_error}{RESET_STYLE}")
-                    log_error(f"Error extracting package {package_name}", exception=extract_error)
-            except Exception as write_error:
-                print(f"{ERROR_STYLE}Error writing zip file: {write_error}{RESET_STYLE}")
-                log_error(f"Error writing zip file for {package_name}", exception=write_error)
-            finally:
-                # Always clean up the zip file
-                if os.path.exists(zip_path):
-                    try:
-                        os.remove(zip_path)
-                        log_info(f"Removed temporary zip file {zip_path}")
-                    except Exception as cleanup_error:
-                        log_error(f"Error removing temporary zip file", exception=cleanup_error)
+    print(f"\n{INFO_STYLE}Installing {len(package_names)} packages...{RESET_STYLE}")
+    log_info(f"Installing multiple packages: {', '.join(package_names)}")
+    
+    installed_count = 0
+    failed_packages = []
+    
+    for pkg in package_names:
+        print(f"\n{INFO_STYLE}Installing {pkg} ({installed_count + 1}/{len(package_names)})...{RESET_STYLE}")
+        if download_package(pkg):
+            installed_count += 1
         else:
-            print(f"{ERROR_STYLE}Error downloading package {package_name}. Status code: {response.status_code}{RESET_STYLE}")
-            log_error(f"Error downloading package {package_name}. Status code: {response.status_code}")
-    except requests.RequestException as req_error:
-        print(f"{ERROR_STYLE}Network error: {req_error}{RESET_STYLE}")
-        log_error(f"Network error downloading package {package_name}", exception=req_error)
+            failed_packages.append(pkg)
+    
+    # Report summary
+    if installed_count == len(package_names):
+        print(f"\n{SUCCESS_STYLE}All {len(package_names)} packages installed successfully!{RESET_STYLE}")
+        log_success(f"All {len(package_names)} packages installed successfully")
+    else:
+        print(f"\n{WARNING_STYLE}Installed {installed_count} of {len(package_names)} packages.{RESET_STYLE}")
+        if failed_packages:
+            print(f"{ERROR_STYLE}Failed packages: {', '.join(failed_packages)}{RESET_STYLE}")
+            log_warning(f"Partial installation. Failed packages: {', '.join(failed_packages)}")
+
+def update_package(package_name):
+    """Update a specific package
+    
+    Args:
+        package_name (str): Name of the package to update
+    """
+    if not is_valid_package(package_name):
+        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
+        return False
+    
+    # Check for version mismatch
+    local_version = get_package_description(package_name, installed=True)['version']
+    
+    try:
+        # Get the online version
+        online_content = get_github_file_content(package_name, "description.txt")
+        if online_content:
+            online_desc = parse_description_file(online_content)
+            online_version = online_desc['version']
+            
+            if local_version == online_version:
+                print(f"{INFO_STYLE}Package {package_name} is already at the latest version ({local_version}).{RESET_STYLE}")
+                confirm = input(f"{WARNING_STYLE}Force update anyway? (y/N): {RESET_STYLE}")
+                if confirm.lower() != 'y':
+                    print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+                    return False
+            else:
+                print(f"{INFO_STYLE}Updating {package_name} from version {local_version} to {online_version}...{RESET_STYLE}")
+        else:
+            print(f"{WARNING_STYLE}Could not check online version for {package_name}.{RESET_STYLE}")
+            confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
+            if confirm.lower() != 'y':
+                print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+                return False
     except Exception as e:
-        print(f"{ERROR_STYLE}Error downloading package {package_name}: {e}{RESET_STYLE}")
-        log_error(f"Error downloading package {package_name}", exception=e)
+        print(f"{WARNING_STYLE}Error checking online version: {e}{RESET_STYLE}")
+        confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
+        if confirm.lower() != 'y':
+            print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+            return False
+    
+    # Proceed with the update
+    return download_package(package_name, is_update=True)
+
+def check_all_updates():
+    """Check for updates for all installed packages"""
+    installed_packages = []
+    if os.path.exists(PACKAGES_DIR):
+        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                            and not d.startswith('.') 
+                            and d != "SigmaOS-packages-main"]
+
+    if not installed_packages:
+        print(f"{WARNING_STYLE}No packages installed.{RESET_STYLE}")
+        return
+    
+    print(f"{INFO_STYLE}Checking for updates for {len(installed_packages)} packages...{RESET_STYLE}")
+    
+    updates_available = []
+    error_packages = []
+    
+    for pkg in installed_packages:
+        try:
+            local_version = get_package_description(pkg, installed=True)['version']
+            online_content = get_github_file_content(pkg, "description.txt")
+            
+            if online_content:
+                online_desc = parse_description_file(online_content)
+                online_version = online_desc['version']
+                
+                if local_version != online_version:
+                    updates_available.append((pkg, local_version, online_version))
+                    print(f"{WARNING_STYLE}Update available for {pkg}: {local_version} → {online_version}{RESET_STYLE}")
+            else:
+                error_packages.append(pkg)
+                print(f"{ERROR_STYLE}Error checking update for {pkg}: Could not fetch online description{RESET_STYLE}")
+        except Exception as e:
+            error_packages.append(pkg)
+            print(f"{ERROR_STYLE}Error checking update for {pkg}: {e}{RESET_STYLE}")
+    
+    if not updates_available:
+        print(f"{SUCCESS_STYLE}All packages are up to date!{RESET_STYLE}")
+        return
+    
+    # Ask the user which packages to update
+    print(f"\n{INFO_STYLE}Updates available for {len(updates_available)} packages:{RESET_STYLE}")
+    for i, (pkg, local_v, online_v) in enumerate(updates_available):
+        print(f"{i+1}. {pkg}: {local_v} → {online_v}")
+    
+    print(f"\n{INFO_STYLE}Options:{RESET_STYLE}")
+    print(f"{command_sth}  all{description_sth}     - Update all packages")
+    print(f"{command_sth}  none{description_sth}    - Skip updates")
+    print(f"{command_sth}  #,#,#{description_sth}   - Update specific packages by number (comma-separated)")
+    
+    choice = input(f"\n{WARNING_STYLE}Enter your choice: {RESET_STYLE}")
+    
+    if choice.lower() == 'none':
+        print(f"{INFO_STYLE}No packages updated.{RESET_STYLE}")
+        return
+    
+    packages_to_update = []
+    
+    if choice.lower() == 'all':
+        packages_to_update = [pkg for pkg, _, _ in updates_available]
+    else:
+        try:
+            # Parse comma-separated numbers
+            indices = [int(x.strip()) - 1 for x in choice.split(',')]
+            for idx in indices:
+                if 0 <= idx < len(updates_available):
+                    packages_to_update.append(updates_available[idx][0])
+                else:
+                    print(f"{ERROR_STYLE}Invalid selection: {idx+1}{RESET_STYLE}")
+        except Exception as e:
+            print(f"{ERROR_STYLE}Invalid input: {e}{RESET_STYLE}")
+            return
+    
+    if not packages_to_update:
+        print(f"{INFO_STYLE}No valid packages selected for update.{RESET_STYLE}")
+        return
+    
+    # Update the selected packages
+    print(f"\n{INFO_STYLE}Updating {len(packages_to_update)} packages...{RESET_STYLE}")
+    
+    updated_count = 0
+    failed_updates = []
+    
+    for pkg in packages_to_update:
+        print(f"\n{INFO_STYLE}Updating {pkg}...{RESET_STYLE}")
+        if download_package(pkg, is_update=True):
+            updated_count += 1
+        else:
+            failed_updates.append(pkg)
+    
+    # Report summary
+    if updated_count == len(packages_to_update):
+        print(f"\n{SUCCESS_STYLE}All {len(packages_to_update)} packages updated successfully!{RESET_STYLE}")
+    else:
+        print(f"\n{WARNING_STYLE}Updated {updated_count} of {len(packages_to_update)} packages.{RESET_STYLE}")
+        if failed_updates:
+            print(f"{ERROR_STYLE}Failed updates: {', '.join(failed_updates)}{RESET_STYLE}")
 
 def uninstall_package(package_name):
     """Uninstall a package by removing its directory"""

@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.1.b"
+VERSION = "0.1.c"
 
 # Define basic console colors for early use before colorama is loaded
 try:
