@@ -35,6 +35,47 @@ except ImportError:
 # Global variable for log file
 LOG_FILE = None
 
+# Check and download ligma.py if needed
+def check_and_download_ligma():
+    """Check if ligma.py exists, download it if not, or update it if outdated"""
+    ligma_path = os.path.join(os.path.dirname(__file__), "ligma.py")
+    ligma_url = "https://raw.githubusercontent.com/The404Company/SigmaOS/main/ligma.py"
+    
+    try:
+        # Check if file exists
+        if not os.path.exists(ligma_path):
+            print(f"{INFO_STYLE}ligma.py not found. Downloading from GitHub...{RESET_STYLE}")
+            response = requests.get(ligma_url)
+            if response.status_code == 200:
+                with open(ligma_path, "w", encoding="utf-8") as f:
+                    f.write(response.text)
+                print(f"{SUCCESS_STYLE}ligma.py downloaded successfully.{RESET_STYLE}")
+            else:
+                print(f"{ERROR_STYLE}Failed to download ligma.py. Status code: {response.status_code}{RESET_STYLE}")
+                return False
+        else:
+            # Check if file is up to date
+            try:
+                response = requests.get(ligma_url)
+                if response.status_code == 200:
+                    current_content = ""
+                    with open(ligma_path, "r", encoding="utf-8") as f:
+                        current_content = f.read()
+                    
+                    if current_content != response.text:
+                        print(f"{INFO_STYLE}Updating ligma.py...{RESET_STYLE}")
+                        with open(ligma_path, "w", encoding="utf-8") as f:
+                            f.write(response.text)
+                        print(f"{SUCCESS_STYLE}ligma.py updated successfully.{RESET_STYLE}")
+            except Exception as e:
+                print(f"{WARNING_STYLE}Could not check for ligma.py updates: {e}{RESET_STYLE}")
+                pass  # Continue even if update check fails
+        
+        return True
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error handling ligma.py: {e}{RESET_STYLE}")
+        return False
+
 # Enhanced logging system
 def log(message, level="INFO", print_to_console=False, traceback=None):
     """
@@ -272,6 +313,7 @@ def install_dependencies():
     
     # If nothing to install, return early
     if not missing_deps:
+        print(f"\n{SUCCESS_STYLE}All essential packages installed successfully!{RESET_STYLE}")
         return
         
     # Now install the missing dependencies
@@ -324,6 +366,32 @@ def install_dependencies():
                 print(f"{WARNING_STYLE}Please manually install the missing dependencies:{RESET_STYLE}")
                 print(f"pip install {' '.join(missing_deps)}")
             sys.exit(1)
+    
+    print(f"\n{SUCCESS_STYLE}All essential packages installed successfully!{RESET_STYLE}")
+
+# Load ligma module after dependencies are installed
+def load_ligma_module():
+    """Import the ligma module dynamically"""
+    try:
+        # First check and download/update ligma.py
+        if not check_and_download_ligma():
+            return None
+            
+        # Import the module
+        spec = importlib.util.spec_from_file_location(
+            "ligma", 
+            os.path.join(os.path.dirname(__file__), "ligma.py")
+        )
+        ligma = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ligma)
+        return ligma
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error loading ligma module: {e}{RESET_STYLE}")
+        log_error(f"Error loading ligma module", exception=e)
+        return None
+
+# The ligma module will be loaded after dependencies are installed
+ligma_module = None
 
 # Check if this is first execution by looking for initialization marker file
 INIT_MARKER = os.path.join(os.path.dirname(__file__), ".initialized")
@@ -352,15 +420,8 @@ import math
 import datetime
 from zipfile import ZipFile
 
-# Try to import GPUtil safely
-GPUtil = safe_import('GPUtil')
-if GPUtil is None and not USING_PYTHON_312_PLUS:
-    print(f"{WARNING_STYLE}GPUtil module not available. Some GPU features will be limited.{RESET_STYLE}")
-elif GPUtil is None and USING_PYTHON_312_PLUS:
-    print(f"{WARNING_STYLE}GPUtil not supported on Python 3.12+. Using alternative GPU detection.{RESET_STYLE}")
-
-# Initialize colorama
-init(autoreset=True)
+# Load ligma module after dependencies are installed
+ligma_module = load_ligma_module()
 
 # Configuration
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
@@ -880,12 +941,22 @@ def setup_essential_packages():
     installed_count = 0
     failed_packages = []
     
+    # Ensure ligma module is loaded
+    global ligma_module
+    if ligma_module is None:
+        ligma_module = load_ligma_module()
+        
+    if ligma_module is None:
+        print(f"{ERROR_STYLE}Failed to load ligma module. Cannot continue with package installation.{RESET_STYLE}")
+        log_error("Failed to load ligma module for essential package installation")
+        return
+    
     for pkg in essential_packages:
         try:
             if not is_valid_package(pkg):
                 print(f"\n{INFO_STYLE}Installing {pkg}...{RESET_STYLE}")
                 log_info(f"Installing essential package: {pkg}")
-                download_package(pkg)
+                ligma_module.download_package(pkg)
                 
                 # Verify installation was successful
                 if is_valid_package(pkg):
@@ -1207,7 +1278,32 @@ def uninstall_package(package_name):
         log_error(f"Error uninstalling {package_name}", exception=e)
         return False
 
+def is_valid_package(package_name):
+    """Check if a package exists and can be executed"""
+    # Parse the package path with dot notation
+    parts = package_name.split('.')
+    base_package = parts[0]
+    
+    # Check if the base package directory exists
+    base_package_dir = os.path.join(PACKAGES_DIR, base_package)
+    if not os.path.exists(base_package_dir):
+        return False
+    
+    # Handle different path formats
+    if len(parts) == 1:
+        # Just the package name, check if main.py exists
+        return os.path.exists(os.path.join(base_package_dir, "main.py"))
+    elif len(parts) == 2:
+        # package.file format, check if file.py exists
+        return os.path.exists(os.path.join(base_package_dir, f"{parts[1]}.py"))
+    else:
+        # Nested format: check if the nested file exists
+        file_name = parts[-1]
+        path_components = parts[:-1]
+        return os.path.exists(os.path.join(PACKAGES_DIR, *path_components, f"{file_name}.py"))
+
 def run_package(package_name):
+    """Execute a package by its name"""
     # Parse the package path with dot notation
     parts = package_name.split('.')
     base_package = parts[0]
@@ -1278,29 +1374,6 @@ def run_package(package_name):
         log_error(f"Unexpected error running package {package_name}", exception=e)
         print(f"{ERROR_STYLE}Unexpected error: {e}{RESET_STYLE}")
         return False
-
-def is_valid_package(package_name):
-    # Parse the package path with dot notation
-    parts = package_name.split('.')
-    base_package = parts[0]
-    
-    # Check if the base package directory exists
-    base_package_dir = os.path.join(PACKAGES_DIR, base_package)
-    if not os.path.exists(base_package_dir):
-        return False
-    
-    # Handle different path formats
-    if len(parts) == 1:
-        # Just the package name, check if main.py exists
-        return os.path.exists(os.path.join(base_package_dir, "main.py"))
-    elif len(parts) == 2:
-        # package.file format, check if file.py exists
-        return os.path.exists(os.path.join(base_package_dir, f"{parts[1]}.py"))
-    else:
-        # Nested format: check if the nested file exists
-        file_name = parts[-1]
-        path_components = parts[:-1]
-        return os.path.exists(os.path.join(PACKAGES_DIR, *path_components, f"{file_name}.py"))
 
 def show_welcome_message():
     if not os.path.exists(PACKAGES_DIR) or not os.listdir(PACKAGES_DIR):
@@ -1739,6 +1812,14 @@ def interactive_shell():
     show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
     aliases = load_aliases()
     
+    # Ensure ligma module is loaded
+    global ligma_module
+    if ligma_module is None:
+        ligma_module = load_ligma_module()
+        if ligma_module is None:
+            print(f"{ERROR_STYLE}Failed to load ligma module. Package management will not be available.{RESET_STYLE}")
+            log_error("Failed to load ligma module during shell initialization")
+    
     # Define command handlers
     def handle_help():
         show_help()
@@ -1758,14 +1839,18 @@ def interactive_shell():
         show_banner()
     
     def handle_ligma(args):
+        if ligma_module is None:
+            print(f"{ERROR_STYLE}Ligma module not available. Try restarting SigmaOS.{RESET_STYLE}")
+            return
+            
         if args:
             subcommand = args[0]
             if subcommand == "list":
-                list_packages()
+                ligma_module.list_packages()
             elif subcommand == "install" and len(args) == 2:
-                download_package(args[1])
+                ligma_module.download_package(args[1])
             elif subcommand == "uninstall" and len(args) == 2:
-                uninstall_package(args[1])
+                ligma_module.uninstall_package(args[1])
             else:
                 print(f"{ERROR_STYLE}Unknown command for ligma.{RESET_STYLE}")
         else:
