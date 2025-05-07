@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.1.c"
+VERSION = "0.1.d"
 
 # Define basic console colors for early use before colorama is loaded
 try:
@@ -1668,10 +1668,21 @@ def interactive_shell():
             elif subcommand == "search" and len(args) >= 2:
                 search_term = " ".join(args[1:])
                 ligma_module.search_packages(search_term)
-            elif subcommand == "install" and len(args) == 2:
-                ligma_module.download_package(args[1])
+            elif subcommand == "install":
+                if len(args) == 2:
+                    # Regular single package install
+                    ligma_module.download_package(args[1])
+                elif len(args) >= 3 and args[-1] == "?m":
+                    # Multiple package installation
+                    packages_to_install = args[1:-1]
+                    ligma_module.install_multiple_packages(packages_to_install)
+                else:
+                    print(f"{ERROR_STYLE}Invalid install command. Use 'ligma install <pkg>' or 'ligma install <pkg1> <pkg2> ... ?m'{RESET_STYLE}")
             elif subcommand == "uninstall" and len(args) == 2:
                 ligma_module.uninstall_package(args[1])
+            elif subcommand in ["?u", "?update"]:
+                # Check all packages for updates
+                ligma_module.check_all_updates()
             elif subcommand in ["?h", "?help"]:
                 ligma_module.show_ligma_help()
             elif len(args) == 2:
@@ -1683,6 +1694,9 @@ def interactive_shell():
                     ligma_module.get_package_version(package_name)
                 elif qualifier in ["?i", "?info"]:
                     ligma_module.show_package_info(package_name)
+                elif qualifier in ["?u", "?update"]:
+                    # Update specific package
+                    ligma_module.update_package(package_name)
                 else:
                     print(f"{ERROR_STYLE}Unknown command: ligma {args[0]} {args[1]}{RESET_STYLE}")
                     print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
