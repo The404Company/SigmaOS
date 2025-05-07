@@ -584,6 +584,31 @@ def download_package(package_name, is_update=False):
         log_error(f"Error {'updating' if is_update else 'installing'} package {package_name}", exception=e)
         return False
 
+def uninstall_package(package_name):
+    """Uninstall a package by removing its directory"""
+    package_dir = os.path.join(PACKAGES_DIR, package_name)
+    
+    if not os.path.exists(package_dir):
+        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
+        log_error(f"Package {package_name} is not installed (uninstall attempt).")
+        return False
+        
+    try:
+        print(f"{WARNING_STYLE}Uninstalling {package_name}...{RESET_STYLE}")
+        log_info(f"Uninstalling package {package_name}")
+        loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
+        # Don't show redundant success message
+        log_info(f"Package {package_name} successfully uninstalled.")
+        return True
+    except PermissionError as e:
+        print(f"{ERROR_STYLE}Permission error uninstalling {package_name}. Try closing any applications using it.{RESET_STYLE}")
+        log_error(f"Permission error uninstalling {package_name}", exception=e)
+        return False
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error uninstalling {package_name}: {e}{RESET_STYLE}")
+        log_error(f"Error uninstalling {package_name}", exception=e)
+        return False
+
 def install_multiple_packages(package_names):
     """Install multiple packages at once
     
@@ -616,174 +641,6 @@ def install_multiple_packages(package_names):
         if failed_packages:
             print(f"{ERROR_STYLE}Failed packages: {', '.join(failed_packages)}{RESET_STYLE}")
             log_warning(f"Partial installation. Failed packages: {', '.join(failed_packages)}")
-
-def update_package(package_name):
-    """Update a specific package
-    
-    Args:
-        package_name (str): Name of the package to update
-    """
-    if not is_valid_package(package_name):
-        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
-        return False
-    
-    # Check for version mismatch
-    local_version = get_package_description(package_name, installed=True)['version']
-    
-    try:
-        # Get the online version
-        online_content = get_github_file_content(package_name, "description.txt")
-        if online_content:
-            online_desc = parse_description_file(online_content)
-            online_version = online_desc['version']
-            
-            if local_version == online_version:
-                print(f"{INFO_STYLE}Package {package_name} is already at the latest version ({local_version}).{RESET_STYLE}")
-                confirm = input(f"{WARNING_STYLE}Force update anyway? (y/N): {RESET_STYLE}")
-                if confirm.lower() != 'y':
-                    print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
-                    return False
-            else:
-                print(f"{INFO_STYLE}Updating {package_name} from version {local_version} to {online_version}...{RESET_STYLE}")
-        else:
-            print(f"{WARNING_STYLE}Could not check online version for {package_name}.{RESET_STYLE}")
-            confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
-            if confirm.lower() != 'y':
-                print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
-                return False
-    except Exception as e:
-        print(f"{WARNING_STYLE}Error checking online version: {e}{RESET_STYLE}")
-        confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
-        if confirm.lower() != 'y':
-            print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
-            return False
-    
-    # Proceed with the update
-    return download_package(package_name, is_update=True)
-
-def check_all_updates():
-    """Check for updates for all installed packages"""
-    installed_packages = []
-    if os.path.exists(PACKAGES_DIR):
-        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
-                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
-                            and not d.startswith('.') 
-                            and d != "SigmaOS-packages-main"]
-
-    if not installed_packages:
-        print(f"{WARNING_STYLE}No packages installed.{RESET_STYLE}")
-        return
-    
-    print(f"{INFO_STYLE}Checking for updates for {len(installed_packages)} packages...{RESET_STYLE}")
-    
-    updates_available = []
-    error_packages = []
-    
-    for pkg in installed_packages:
-        try:
-            local_version = get_package_description(pkg, installed=True)['version']
-            online_content = get_github_file_content(pkg, "description.txt")
-            
-            if online_content:
-                online_desc = parse_description_file(online_content)
-                online_version = online_desc['version']
-                
-                if local_version != online_version:
-                    updates_available.append((pkg, local_version, online_version))
-                    print(f"{WARNING_STYLE}Update available for {pkg}: {local_version} → {online_version}{RESET_STYLE}")
-            else:
-                error_packages.append(pkg)
-                print(f"{ERROR_STYLE}Error checking update for {pkg}: Could not fetch online description{RESET_STYLE}")
-        except Exception as e:
-            error_packages.append(pkg)
-            print(f"{ERROR_STYLE}Error checking update for {pkg}: {e}{RESET_STYLE}")
-    
-    if not updates_available:
-        print(f"{SUCCESS_STYLE}All packages are up to date!{RESET_STYLE}")
-        return
-    
-    # Ask the user which packages to update
-    print(f"\n{INFO_STYLE}Updates available for {len(updates_available)} packages:{RESET_STYLE}")
-    for i, (pkg, local_v, online_v) in enumerate(updates_available):
-        print(f"{i+1}. {pkg}: {local_v} → {online_v}")
-    
-    print(f"\n{INFO_STYLE}Options:{RESET_STYLE}")
-    print(f"{command_sth}  all{description_sth}     - Update all packages")
-    print(f"{command_sth}  none{description_sth}    - Skip updates")
-    print(f"{command_sth}  #,#,#{description_sth}   - Update specific packages by number (comma-separated)")
-    
-    choice = input(f"\n{WARNING_STYLE}Enter your choice: {RESET_STYLE}")
-    
-    if choice.lower() == 'none':
-        print(f"{INFO_STYLE}No packages updated.{RESET_STYLE}")
-        return
-    
-    packages_to_update = []
-    
-    if choice.lower() == 'all':
-        packages_to_update = [pkg for pkg, _, _ in updates_available]
-    else:
-        try:
-            # Parse comma-separated numbers
-            indices = [int(x.strip()) - 1 for x in choice.split(',')]
-            for idx in indices:
-                if 0 <= idx < len(updates_available):
-                    packages_to_update.append(updates_available[idx][0])
-                else:
-                    print(f"{ERROR_STYLE}Invalid selection: {idx+1}{RESET_STYLE}")
-        except Exception as e:
-            print(f"{ERROR_STYLE}Invalid input: {e}{RESET_STYLE}")
-            return
-    
-    if not packages_to_update:
-        print(f"{INFO_STYLE}No valid packages selected for update.{RESET_STYLE}")
-        return
-    
-    # Update the selected packages
-    print(f"\n{INFO_STYLE}Updating {len(packages_to_update)} packages...{RESET_STYLE}")
-    
-    updated_count = 0
-    failed_updates = []
-    
-    for pkg in packages_to_update:
-        print(f"\n{INFO_STYLE}Updating {pkg}...{RESET_STYLE}")
-        if download_package(pkg, is_update=True):
-            updated_count += 1
-        else:
-            failed_updates.append(pkg)
-    
-    # Report summary
-    if updated_count == len(packages_to_update):
-        print(f"\n{SUCCESS_STYLE}All {len(packages_to_update)} packages updated successfully!{RESET_STYLE}")
-    else:
-        print(f"\n{WARNING_STYLE}Updated {updated_count} of {len(packages_to_update)} packages.{RESET_STYLE}")
-        if failed_updates:
-            print(f"{ERROR_STYLE}Failed updates: {', '.join(failed_updates)}{RESET_STYLE}")
-
-def uninstall_package(package_name):
-    """Uninstall a package by removing its directory"""
-    package_dir = os.path.join(PACKAGES_DIR, package_name)
-    
-    if not os.path.exists(package_dir):
-        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
-        log_error(f"Package {package_name} is not installed (uninstall attempt).")
-        return False
-        
-    try:
-        print(f"{WARNING_STYLE}Uninstalling {package_name}...{RESET_STYLE}")
-        log_info(f"Uninstalling package {package_name}")
-        loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
-        # Don't show redundant success message
-        log_info(f"Package {package_name} successfully uninstalled.")
-        return True
-    except PermissionError as e:
-        print(f"{ERROR_STYLE}Permission error uninstalling {package_name}. Try closing any applications using it.{RESET_STYLE}")
-        log_error(f"Permission error uninstalling {package_name}", exception=e)
-        return False
-    except Exception as e:
-        print(f"{ERROR_STYLE}Error uninstalling {package_name}: {e}{RESET_STYLE}")
-        log_error(f"Error uninstalling {package_name}", exception=e)
-        return False
 
 def run_package(package_name):
     """
@@ -891,3 +748,155 @@ def is_valid_package(package_name):
         file_name = parts[-1]
         path_components = parts[:-1]
         return os.path.exists(os.path.join(PACKAGES_DIR, *path_components, f"{file_name}.py")) 
+
+def check_all_updates():
+    """Check for updates for all installed packages"""
+    installed_packages = []
+    if os.path.exists(PACKAGES_DIR):
+        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                            and not d.startswith('.') 
+                            and d != "SigmaOS-packages-main"]
+
+    if not installed_packages:
+        print(f"{WARNING_STYLE}No packages installed.{RESET_STYLE}")
+        return
+    
+    print(f"{INFO_STYLE}Checking for updates for {len(installed_packages)} packages...{RESET_STYLE}")
+    
+    updates_available = []
+    error_packages = []
+    
+    for pkg in installed_packages:
+        try:
+            local_version = get_package_description(pkg, installed=True)['version']
+            online_content = get_github_file_content(pkg, "description.txt")
+            
+            if online_content:
+                online_desc = parse_description_file(online_content)
+                online_version = online_desc['version']
+                
+                if local_version != online_version:
+                    updates_available.append((pkg, local_version, online_version))
+                    print(f"{WARNING_STYLE}Update available for {pkg}: {local_version} → {online_version}{RESET_STYLE}")
+            else:
+                error_packages.append(pkg)
+                print(f"{ERROR_STYLE}Error checking update for {pkg}: Could not fetch online description{RESET_STYLE}")
+        except Exception as e:
+            error_packages.append(pkg)
+            print(f"{ERROR_STYLE}Error checking update for {pkg}: {e}{RESET_STYLE}")
+    
+    if not updates_available:
+        print(f"{SUCCESS_STYLE}All packages are up to date!{RESET_STYLE}")
+        return
+    
+    # Get styling variables
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import command_sth, description_sth
+    except ImportError:
+        # Fallback styles
+        command_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+    
+    # Ask the user which packages to update
+    print(f"\n{INFO_STYLE}Updates available for {len(updates_available)} packages:{RESET_STYLE}")
+    for i, (pkg, local_v, online_v) in enumerate(updates_available):
+        print(f"{i+1}. {pkg}: {local_v} → {online_v}")
+    
+    print(f"\n{INFO_STYLE}Options:{RESET_STYLE}")
+    print(f"{command_sth}  all{description_sth}     - Update all packages")
+    print(f"{command_sth}  none{description_sth}    - Skip updates")
+    print(f"{command_sth}  #,#,#{description_sth}   - Update specific packages by number (comma-separated)")
+    
+    choice = input(f"\n{WARNING_STYLE}Enter your choice: {RESET_STYLE}")
+    
+    if choice.lower() == 'none':
+        print(f"{INFO_STYLE}No packages updated.{RESET_STYLE}")
+        return
+    
+    packages_to_update = []
+    
+    if choice.lower() == 'all':
+        packages_to_update = [pkg for pkg, _, _ in updates_available]
+    else:
+        try:
+            # Parse comma-separated numbers
+            indices = [int(x.strip()) - 1 for x in choice.split(',')]
+            for idx in indices:
+                if 0 <= idx < len(updates_available):
+                    packages_to_update.append(updates_available[idx][0])
+                else:
+                    print(f"{ERROR_STYLE}Invalid selection: {idx+1}{RESET_STYLE}")
+        except Exception as e:
+            print(f"{ERROR_STYLE}Invalid input: {e}{RESET_STYLE}")
+            return
+    
+    if not packages_to_update:
+        print(f"{INFO_STYLE}No valid packages selected for update.{RESET_STYLE}")
+        return
+    
+    # Update the selected packages
+    print(f"\n{INFO_STYLE}Updating {len(packages_to_update)} packages...{RESET_STYLE}")
+    
+    updated_count = 0
+    failed_updates = []
+    
+    for pkg in packages_to_update:
+        print(f"\n{INFO_STYLE}Updating {pkg}...{RESET_STYLE}")
+        if download_package(pkg, is_update=True):
+            updated_count += 1
+        else:
+            failed_updates.append(pkg)
+    
+    # Report summary
+    if updated_count == len(packages_to_update):
+        print(f"\n{SUCCESS_STYLE}All {len(packages_to_update)} packages updated successfully!{RESET_STYLE}")
+    else:
+        print(f"\n{WARNING_STYLE}Updated {updated_count} of {len(packages_to_update)} packages.{RESET_STYLE}")
+        if failed_updates:
+            print(f"{ERROR_STYLE}Failed updates: {', '.join(failed_updates)}{RESET_STYLE}")
+
+def update_package(package_name):
+    """Update a specific package
+    
+    Args:
+        package_name (str): Name of the package to update
+    """
+    if not is_valid_package(package_name):
+        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
+        return False
+    
+    # Check for version mismatch
+    local_version = get_package_description(package_name, installed=True)['version']
+    
+    try:
+        # Get the online version
+        online_content = get_github_file_content(package_name, "description.txt")
+        if online_content:
+            online_desc = parse_description_file(online_content)
+            online_version = online_desc['version']
+            
+            if local_version == online_version:
+                print(f"{INFO_STYLE}Package {package_name} is already at the latest version ({local_version}).{RESET_STYLE}")
+                confirm = input(f"{WARNING_STYLE}Force update anyway? (y/N): {RESET_STYLE}")
+                if confirm.lower() != 'y':
+                    print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+                    return False
+            else:
+                print(f"{INFO_STYLE}Updating {package_name} from version {local_version} to {online_version}...{RESET_STYLE}")
+        else:
+            print(f"{WARNING_STYLE}Could not check online version for {package_name}.{RESET_STYLE}")
+            confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
+            if confirm.lower() != 'y':
+                print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+                return False
+    except Exception as e:
+        print(f"{WARNING_STYLE}Error checking online version: {e}{RESET_STYLE}")
+        confirm = input(f"{WARNING_STYLE}Continue with update? (y/N): {RESET_STYLE}")
+        if confirm.lower() != 'y':
+            print(f"{INFO_STYLE}Update cancelled.{RESET_STYLE}")
+            return False
+    
+    # Proceed with the update
+    return download_package(package_name, is_update=True) 
