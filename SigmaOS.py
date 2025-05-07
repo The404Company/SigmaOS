@@ -11,7 +11,8 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.1.9"
+VERSION = "0.1.b"
+
 # Define basic console colors for early use before colorama is loaded
 try:
     # First try to import colorama for basic styling
@@ -36,20 +37,20 @@ except ImportError:
 LOG_FILE = None
 
 # Check and download ligma.py if needed
-def check_and_download_ligma():
+def check_and_download_ligma(force_update=False):
     """Check if ligma.py exists, download it if not, or update it if outdated"""
     ligma_path = os.path.join(os.path.dirname(__file__), "ligma.py")
     ligma_url = "https://raw.githubusercontent.com/The404Company/SigmaOS/main/ligma.py"
     
     try:
         # Check if file exists
-        if not os.path.exists(ligma_path):
-            print(f"{INFO_STYLE}ligma.py not found. Downloading from GitHub...{RESET_STYLE}")
+        if not os.path.exists(ligma_path) or force_update:
+            print(f"{INFO_STYLE}{'Updating' if force_update else 'Downloading'} ligma.py from GitHub...{RESET_STYLE}")
             response = requests.get(ligma_url)
             if response.status_code == 200:
                 with open(ligma_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
-                print(f"{SUCCESS_STYLE}ligma.py downloaded successfully.{RESET_STYLE}")
+                print(f"{SUCCESS_STYLE}ligma.py {'updated' if force_update else 'downloaded'} successfully.{RESET_STYLE}")
             else:
                 print(f"{ERROR_STYLE}Failed to download ligma.py. Status code: {response.status_code}{RESET_STYLE}")
                 return False
@@ -173,7 +174,7 @@ def clear_screen():
 def show_text_splash():
     """Show a simple text splash screen without using any external libraries"""
     clear_screen()
-    splash_text = f"""
+    splash_text = fr"""
    _____ _                       ____  _____ 
   / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
   \__ \/ / __ `/ __ `__ \/ __ `/ / / /\__ \ 
@@ -420,8 +421,18 @@ import math
 import datetime
 from zipfile import ZipFile
 
-# Load ligma module after dependencies are installed
+# Now load the ligma module after dependencies are installed
 ligma_module = load_ligma_module()
+
+# Try to import GPUtil safely
+GPUtil = safe_import('GPUtil')
+if GPUtil is None and not USING_PYTHON_312_PLUS:
+    print(f"{WARNING_STYLE}GPUtil module not available. Some GPU features will be limited.{RESET_STYLE}")
+elif GPUtil is None and USING_PYTHON_312_PLUS:
+    print(f"{WARNING_STYLE}GPUtil not supported on Python 3.12+. Using alternative GPU detection.{RESET_STYLE}")
+
+# Initialize colorama
+init(autoreset=True)
 
 # Configuration
 REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
@@ -628,13 +639,14 @@ ALL_COMMANDS = {
     'clear': [],
     'setup': [],
     'reset': [],
-    'ligma': ['list', 'install', 'uninstall'],
+    'ligma': ['list', 'install', 'uninstall', 'browse', 'search', '?v', '?version', '?i', '?info', '?h', '?help'],
     'alias': ['list', 'add', 'remove'],
     'sysinfo': [],
     'now': [],
     'sendlogs': [],
     'timer': [],
     'theme': ['list', 'set', 'edit', 'create', 'delete', 'show'],
+    'update-ligma': [],
 }
 
 init(autoreset=True)  # Initialize colorama
@@ -732,6 +744,7 @@ def show_help():
         ("sysinfo", "Show system information"),
         ("now", "Show current date and time"),
         ("sendlogs", "Send logs to Discord"),
+        ("update-ligma", "Force update ligma.py to the latest version"),
         ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
         ]
     for cmd, desc in system_commands:
@@ -754,9 +767,14 @@ def show_help():
     # Package Management
     print(f"\n{INFO_STYLE}Package Management:{RESET_STYLE}")
     pkg_commands = [
-        ("ligma list", "List available packages"),
+        ("ligma list", "List installed packages"),
+        ("ligma browse", "Browse all available packages"),
+        ("ligma search <term>", "Search for packages"),
         ("ligma install <pkg>", "Install a package"),
         ("ligma uninstall <pkg>", "Uninstall a package"),
+        ("ligma <pkg> ?v", "Show package version"),
+        ("ligma <pkg> ?i", "Show package info"),
+        ("ligma ?help", "Show ligma help"),
         ("<package>", "Run a package directly")
     ]
     for cmd, desc in pkg_commands:
@@ -1050,234 +1068,6 @@ def reset_sigmaos():
     
     print(f"{INFO_STYLE}Run 'setup' to reinstall essential packages.{RESET_STYLE}")
 
-def get_github_file_content(package_name, filename):
-    """Fetch raw file content from GitHub"""
-    url = f"https://raw.githubusercontent.com/The404Company/SigmaOS-packages/main/{package_name}/{filename}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.text.strip()
-    except:
-        pass
-    return None
-
-def parse_description_file(content):
-    """Parse the sections from a description.txt file"""
-    sections = {
-        'description': 'No description available',
-        'author': 'Unknown',
-        'version': '0.0',
-        'requirements': []
-    }
-    
-    current_section = None
-    for line in content.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-            
-        if line.startswith('[') and line.endswith(']'):
-            current_section = line[1:-1].lower()
-            continue
-            
-        if current_section:
-            if current_section == 'requirements':
-                if line:
-                    sections[current_section].append(line)
-            else:
-                sections[current_section] = line
-                
-    return sections
-
-def get_package_description(package_name, installed=True):
-    """Get package description from local file or GitHub"""
-    if installed and is_valid_package(package_name):
-        desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
-        try:
-            if os.path.exists(desc_file):
-                with open(desc_file, 'r', encoding='utf-8') as f:
-                    return parse_description_file(f.read())
-        except:
-            pass
-    else:
-        # Try to fetch from GitHub for non-installed packages
-        content = get_github_file_content(package_name, "description.txt")
-        if content:
-            return parse_description_file(content)
-    
-    return {'description': 'No description available', 'author': 'Unknown', 'version': '0.0', 'requirements': []}
-
-def list_packages():
-    # Get installed packages first
-    installed_packages = []
-    if os.path.exists(PACKAGES_DIR):
-        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
-                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
-                            and not d.startswith('.') 
-                            and d != "SigmaOS-packages-main"]
-
-    # Get available packages from repo
-    headers = {'Accept': 'application/vnd.github.v3+json'}
-    response = requests.get(f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/", headers=headers)
-    loading_animation("Fetching packages...")
-    
-    if response.status_code == 200:
-        data = response.json()
-        available_packages = [item["name"] for item in data 
-                            if item["type"] == "dir" and not item["name"].startswith('.')]
-        
-        print(f"\n{INFO_STYLE}Available packages:{RESET_STYLE}")
-        packages_found = False
-        
-        # Show installed packages first
-        if installed_packages:
-            print(f"\n{SUCCESS_STYLE}Installed:{RESET_STYLE}")
-            for i, pkg in enumerate(installed_packages):
-                if i > 0:  # Add empty line before each package except the first one
-                    print()
-                desc = get_package_description(pkg)
-                print(f"{package_sth}{pkg} {description_sth}- {desc['description']}")
-                print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
-                packages_found = True
-        
-        # Show available but not installed packages
-        not_installed = [pkg for pkg in available_packages if pkg not in installed_packages]
-        if not_installed:
-            print(f"\n{WARNING_STYLE}Not Installed:{RESET_STYLE}")
-            for i, pkg in enumerate(not_installed):
-                if i > 0:  # Add empty line before each package except the first one
-                    print()
-                desc = get_package_description(pkg, installed=False)
-                print(f"{description_sth}{pkg} - {desc['description']}")
-                print(f"{package_status_sth}{desc['author']} - v{desc['version']}")
-                packages_found = True
-        
-        if not packages_found:
-            print(f"{ERROR_STYLE}No packages found in repository.{RESET_STYLE}")
-    else:
-        print(f"{ERROR_STYLE}Error fetching repositories. Status code: {response.status_code}{RESET_STYLE}")
-        print(f"{ERROR_STYLE}Response: {response.text}{RESET_STYLE}")
-
-def download_package(package_name):
-    if not os.path.exists(PACKAGES_DIR):
-        os.makedirs(PACKAGES_DIR)
-        log_info(f"Created packages directory at {PACKAGES_DIR}")
-
-    package_dir = os.path.join(PACKAGES_DIR, package_name)
-
-    if os.path.exists(package_dir):
-        print(f"{WARNING_STYLE}Package {package_name} already downloaded.{RESET_STYLE}")
-        log_warning(f"Package {package_name} already downloaded.")
-        return
-
-    download_url = f"{REPO_URL}/archive/refs/heads/main.zip"
-
-    try:
-        loading_animation(f"Downloading {package_name}", task=lambda: requests.get(download_url))
-        zip_path = os.path.join(PACKAGES_DIR, f"{package_name}.zip")
-        response = requests.get(download_url)
-
-        if response.status_code == 200:
-            try:
-                with open(zip_path, "wb") as f:
-                    f.write(response.content)
-                log_info(f"Downloaded zip file for {package_name}")
-
-                try:
-                    with ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(PACKAGES_DIR)
-                    log_info(f"Extracted zip file for {package_name}")
-
-                    extracted_folder = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main", package_name)
-                    if os.path.exists(extracted_folder):
-                        if os.path.exists(package_dir):
-                            shutil.rmtree(package_dir)
-                        os.rename(extracted_folder, package_dir)
-                        log_info(f"Renamed extracted folder to {package_dir}")
-                        
-                        # Install package requirements
-                        desc = get_package_description(package_name)
-                        if desc['requirements']:
-                            print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
-                            log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
-                            core_libs = {"colorama", "requests", "datetime", "json"}
-                            for req in desc['requirements']:
-                                if req.lower() in core_libs:
-                                    print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
-                                    log_info(f"Skipping requirement {req} (core library)")
-                                else:
-                                    try:
-                                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
-                                            [sys.executable, "-m", "pip", "install", req], 
-                                            stdout=subprocess.DEVNULL, 
-                                            stderr=subprocess.DEVNULL
-                                        ))
-                                        log_info(f"Installed requirement {req}")
-                                    except Exception as e:
-                                        print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
-                                        log_error(f"Error installing requirement {req}", exception=e)
-                        
-                        # Clean up SigmaOS-packages-main folder
-                        sigmamain_dir = os.path.join(PACKAGES_DIR, "SigmaOS-packages-main")
-                        if os.path.exists(sigmamain_dir):
-                            loading_animation("Cleaning up temporary files", task=lambda: shutil.rmtree(sigmamain_dir))
-                            log_info("Cleaned up temporary files")
-                        print(f"{SUCCESS_STYLE}Package {package_name} successfully installed.{RESET_STYLE}")
-                        # Remove the duplicated log output that also displays to console
-                        log_info(f"Package {package_name} successfully installed.")
-                    else:
-                        print(f"{ERROR_STYLE}Package {package_name} not found in downloaded archive.{RESET_STYLE}")
-                        # Remove the duplicated log output that also displays to console
-                        log_info(f"Package {package_name} not found in downloaded archive.")
-                except Exception as extract_error:
-                    print(f"{ERROR_STYLE}Error extracting package: {extract_error}{RESET_STYLE}")
-                    log_error(f"Error extracting package {package_name}", exception=extract_error)
-            except Exception as write_error:
-                print(f"{ERROR_STYLE}Error writing zip file: {write_error}{RESET_STYLE}")
-                log_error(f"Error writing zip file for {package_name}", exception=write_error)
-            finally:
-                # Always clean up the zip file
-                if os.path.exists(zip_path):
-                    try:
-                        os.remove(zip_path)
-                        log_info(f"Removed temporary zip file {zip_path}")
-                    except Exception as cleanup_error:
-                        log_error(f"Error removing temporary zip file", exception=cleanup_error)
-        else:
-            print(f"{ERROR_STYLE}Error downloading package {package_name}. Status code: {response.status_code}{RESET_STYLE}")
-            log_error(f"Error downloading package {package_name}. Status code: {response.status_code}")
-    except requests.RequestException as req_error:
-        print(f"{ERROR_STYLE}Network error: {req_error}{RESET_STYLE}")
-        log_error(f"Network error downloading package {package_name}", exception=req_error)
-    except Exception as e:
-        print(f"{ERROR_STYLE}Error downloading package {package_name}: {e}{RESET_STYLE}")
-        log_error(f"Error downloading package {package_name}", exception=e)
-
-def uninstall_package(package_name):
-    """Uninstall a package by removing its directory"""
-    package_dir = os.path.join(PACKAGES_DIR, package_name)
-    
-    if not os.path.exists(package_dir):
-        print(f"{ERROR_STYLE}Package {package_name} is not installed.{RESET_STYLE}")
-        log_error(f"Package {package_name} is not installed (uninstall attempt).")
-        return False
-        
-    try:
-        print(f"{WARNING_STYLE}Uninstalling {package_name}...{RESET_STYLE}")
-        log_info(f"Uninstalling package {package_name}")
-        loading_animation(f"Removed {package_name}", task=lambda: shutil.rmtree(package_dir))
-        # Don't show redundant success message
-        log_info(f"Package {package_name} successfully uninstalled.")
-        return True
-    except PermissionError as e:
-        print(f"{ERROR_STYLE}Permission error uninstalling {package_name}. Try closing any applications using it.{RESET_STYLE}")
-        log_error(f"Permission error uninstalling {package_name}", exception=e)
-        return False
-    except Exception as e:
-        print(f"{ERROR_STYLE}Error uninstalling {package_name}: {e}{RESET_STYLE}")
-        log_error(f"Error uninstalling {package_name}", exception=e)
-        return False
-
 def is_valid_package(package_name):
     """Check if a package exists and can be executed"""
     # Parse the package path with dot notation
@@ -1536,7 +1326,7 @@ def show_splash_screen():
         return
         
     # Show splash text
-    splash_text = f"""
+    splash_text = fr"""
    _____ _                       ____  _____ 
   / ___/(_)___ _____ ___  ____ _/ __ \/ ___/
   \__ \/ / __ `/ __ `__ \/ __ `/ / / /\__ \ 
@@ -1799,6 +1589,29 @@ def show_theme(theme_name):
         print(f"{ERROR_STYLE}Error showing theme: {e}{RESET_STYLE}")
         log_error(f"Error showing theme '{theme_name}'", exception=e)
 
+def force_update_ligma():
+    """Force update ligma.py from GitHub"""
+    print(f"{INFO_STYLE}Forcing ligma.py update...{RESET_STYLE}")
+    log_info("Forcing ligma.py update")
+    
+    # Force the update
+    if check_and_download_ligma(force_update=True):
+        print(f"{SUCCESS_STYLE}ligma.py has been updated to the latest version.{RESET_STYLE}")
+        log_success("ligma.py successfully updated")
+        
+        # Reload the ligma module
+        global ligma_module
+        ligma_module = load_ligma_module()
+        if ligma_module:
+            print(f"{SUCCESS_STYLE}ligma module reloaded successfully.{RESET_STYLE}")
+            log_success("ligma module reloaded successfully")
+        else:
+            print(f"{ERROR_STYLE}Failed to reload ligma module after update.{RESET_STYLE}")
+            log_error("Failed to reload ligma module after update")
+    else:
+        print(f"{ERROR_STYLE}Failed to update ligma.py.{RESET_STYLE}")
+        log_error("Failed to update ligma.py")
+
 def interactive_shell():
     # Exit if we're a subprocess instance
     if os.environ.get('SIGMAOS_SUBPROCESS') == '1':
@@ -1838,23 +1651,53 @@ def interactive_shell():
         reset_sigmaos()
         show_banner()
     
+    def handle_update_ligma(args=None):
+        force_update_ligma()
+    
     def handle_ligma(args):
         if ligma_module is None:
-            print(f"{ERROR_STYLE}Ligma module not available. Try restarting SigmaOS.{RESET_STYLE}")
+            print(f"{ERROR_STYLE}Ligma module not available. Try restarting SigmaOS or running 'update-ligma'.{RESET_STYLE}")
             return
             
         if args:
             subcommand = args[0]
             if subcommand == "list":
-                ligma_module.list_packages()
+                ligma_module.show_installed_packages()
+            elif subcommand == "browse":
+                ligma_module.browse_packages()
+            elif subcommand == "search" and len(args) >= 2:
+                search_term = " ".join(args[1:])
+                ligma_module.search_packages(search_term)
             elif subcommand == "install" and len(args) == 2:
                 ligma_module.download_package(args[1])
             elif subcommand == "uninstall" and len(args) == 2:
                 ligma_module.uninstall_package(args[1])
+            elif subcommand in ["?h", "?help"]:
+                ligma_module.show_ligma_help()
+            elif len(args) == 2:
+                # Commands with package name and qualifier
+                package_name = args[0]
+                qualifier = args[1]
+                
+                if qualifier in ["?v", "?version"]:
+                    ligma_module.get_package_version(package_name)
+                elif qualifier in ["?i", "?info"]:
+                    ligma_module.show_package_info(package_name)
+                else:
+                    print(f"{ERROR_STYLE}Unknown command: ligma {args[0]} {args[1]}{RESET_STYLE}")
+                    print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
             else:
-                print(f"{ERROR_STYLE}Unknown command for ligma.{RESET_STYLE}")
+                print(f"{ERROR_STYLE}Unknown command for ligma: {subcommand}{RESET_STYLE}")
+                print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
         else:
-            print(f"{WARNING_STYLE}Usage: ligma: list | install <package> | uninstall <package>{RESET_STYLE}")
+            print(f"{INFO_STYLE}Available ligma commands:{RESET_STYLE}")
+            print(f"{command_sth}  list{description_sth}      - Show installed packages")
+            print(f"{command_sth}  browse{description_sth}    - Browse all available packages")
+            print(f"{command_sth}  search{description_sth}    - Search for packages")
+            print(f"{command_sth}  install{description_sth}   - Install a package")
+            print(f"{command_sth}  uninstall{description_sth} - Uninstall a package")
+            print(f"{command_sth}  ?help{description_sth}     - Show detailed help")
+            print(f"\n{INFO_STYLE}Use 'ligma ?help' for more detailed help.{RESET_STYLE}")
     
     def handle_alias(args):
         if not args:
@@ -1945,7 +1788,8 @@ def interactive_shell():
         "sendlogs": handle_sendlogs,
         "timer": handle_timer,
         "rick": handle_rick,
-        "theme": handle_theme
+        "theme": handle_theme,
+        "update-ligma": handle_update_ligma
     }
     
     while True:

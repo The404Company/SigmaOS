@@ -160,7 +160,151 @@ def get_package_description(package_name, installed=True):
     
     return {'description': 'No description available', 'author': 'Unknown', 'version': '0.0', 'requirements': []}
 
-def list_packages():
+def get_package_version(package_name):
+    """Show the version of a package"""
+    desc = get_package_description(package_name, is_valid_package(package_name))
+    installed_text = "installed" if is_valid_package(package_name) else "available"
+    print(f"\n{INFO_STYLE}Package {package_name} ({installed_text}){RESET_STYLE}")
+    print(f"{SUCCESS_STYLE}Version: {desc['version']}{RESET_STYLE}")
+
+def show_package_info(package_name):
+    """Show the full package description with highlighted section headers"""
+    desc_file = None
+    
+    # First try to get the local file if installed
+    if is_valid_package(package_name):
+        desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
+        source = "installed"
+    else:
+        # If not installed, try to get from GitHub
+        content = get_github_file_content(package_name, "description.txt")
+        if content:
+            # Create a temporary file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(content)
+                desc_file = f.name
+            source = "online repository"
+    
+    if not desc_file or not os.path.exists(desc_file):
+        print(f"{ERROR_STYLE}No description available for {package_name}{RESET_STYLE}")
+        return
+    
+    try:
+        with open(desc_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        print(f"\n{INFO_STYLE}Package information for {package_name} (from {source}):{RESET_STYLE}\n")
+        
+        # Format the content with highlighted section headers
+        for line in content.splitlines():
+            if line.startswith('[') and line.endswith(']'):
+                print(f"{SUCCESS_STYLE}{line}{RESET_STYLE}")
+            else:
+                print(line)
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error reading description: {e}{RESET_STYLE}")
+    finally:
+        # Clean up temporary file if we created one
+        if source == "online repository" and desc_file and os.path.exists(desc_file):
+            os.unlink(desc_file)
+
+def show_installed_packages():
+    """Show only installed packages"""
+    installed_packages = []
+    if os.path.exists(PACKAGES_DIR):
+        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                            and not d.startswith('.') 
+                            and d != "SigmaOS-packages-main"]
+    
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import package_sth, description_sth, package_status_sth, SUCCESS_STYLE, WARNING_STYLE, ERROR_STYLE
+    except ImportError:
+        # Fallback styles
+        package_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        package_status_sth = INFO_STYLE
+    
+    if installed_packages:
+        print(f"\n{SUCCESS_STYLE}Installed Packages:{RESET_STYLE}")
+        for i, pkg in enumerate(installed_packages):
+            if i > 0:  # Add empty line before each package except the first one
+                print()
+            desc = get_package_description(pkg)
+            print(f"{package_sth}{pkg} {description_sth}- {desc['description']}")
+            print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
+    else:
+        print(f"{WARNING_STYLE}No packages installed. Use 'ligma browse' to see available packages.{RESET_STYLE}")
+
+def search_packages(search_term):
+    """Search for packages by name or description"""
+    search_term = search_term.lower()
+    
+    # Get installed packages first (for status tracking)
+    installed_packages = []
+    if os.path.exists(PACKAGES_DIR):
+        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                            and not d.startswith('.') 
+                            and d != "SigmaOS-packages-main"]
+    
+    # Get available packages from repo
+    headers = {'Accept': 'application/vnd.github.v3+json'}
+    print(f"{INFO_STYLE}Searching packages for '{search_term}'...{RESET_STYLE}")
+    response = requests.get(f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/", headers=headers)
+    
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import package_sth, description_sth, package_status_sth, SUCCESS_STYLE, WARNING_STYLE, ERROR_STYLE
+    except ImportError:
+        # Fallback styles
+        package_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        package_status_sth = INFO_STYLE
+    
+    if response.status_code == 200:
+        data = response.json()
+        package_names = [item["name"] for item in data 
+                       if item["type"] == "dir" and not item["name"].startswith('.')]
+        
+        matches = []
+        
+        # First quick check for name matches
+        name_matches = [pkg for pkg in package_names if search_term in pkg.lower()]
+        matches.extend(name_matches)
+        
+        # Then check descriptions for any remaining packages
+        for pkg in package_names:
+            if pkg not in name_matches:
+                desc = get_package_description(pkg, installed=(pkg in installed_packages))
+                if search_term in desc['description'].lower():
+                    matches.append(pkg)
+        
+        # Remove duplicates
+        matches = list(set(matches))
+        
+        if matches:
+            print(f"\n{SUCCESS_STYLE}Found {len(matches)} package(s) matching '{search_term}':{RESET_STYLE}")
+            
+            for i, pkg in enumerate(matches):
+                if i > 0:  # Add empty line before each package except the first one
+                    print()
+                
+                is_installed = pkg in installed_packages
+                status = f"{SUCCESS_STYLE}[Installed]{RESET_STYLE}" if is_installed else f"{WARNING_STYLE}[Available]{RESET_STYLE}"
+                
+                desc = get_package_description(pkg, installed=is_installed)
+                print(f"{package_sth}{pkg} {status} {description_sth}- {desc['description']}")
+                print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
+        else:
+            print(f"{WARNING_STYLE}No packages found matching '{search_term}'{RESET_STYLE}")
+    else:
+        print(f"{ERROR_STYLE}Error searching packages. Status code: {response.status_code}{RESET_STYLE}")
+
+def browse_packages():
+    """Browse all available packages (formerly list_packages)"""
     # Get installed packages first
     installed_packages = []
     if os.path.exists(PACKAGES_DIR):
@@ -219,6 +363,68 @@ def list_packages():
     else:
         print(f"{ERROR_STYLE}Error fetching repositories. Status code: {response.status_code}{RESET_STYLE}")
         print(f"{ERROR_STYLE}Response: {response.text}{RESET_STYLE}")
+
+def show_ligma_help():
+    """Show detailed help for all ligma commands"""
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import command_sth, description_sth, header_sth, INFO_STYLE, SUCCESS_STYLE, RESET_STYLE
+    except ImportError:
+        # Fallback styles
+        command_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        header_sth = INFO_STYLE
+        INFO_STYLE = INFO_STYLE
+        SUCCESS_STYLE = SUCCESS_STYLE
+        RESET_STYLE = RESET_STYLE
+    
+    print(f"\n{header_sth}╔══ Ligma Package Manager Help ══════════════════════════╗{RESET_STYLE}")
+    
+    # Package Browsing
+    print(f"\n{INFO_STYLE}Package Browsing:{RESET_STYLE}")
+    browse_commands = [
+        ("ligma list", "Show installed packages only"),
+        ("ligma browse", "Browse all available packages"),
+        ("ligma search <term>", "Search for packages by name or description")
+    ]
+    for cmd, desc in browse_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+    
+    # Package Management
+    print(f"\n{INFO_STYLE}Package Management:{RESET_STYLE}")
+    manage_commands = [
+        ("ligma install <pkg>", "Install a package"),
+        ("ligma uninstall <pkg>", "Uninstall a package")
+    ]
+    for cmd, desc in manage_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+    
+    # Package Information
+    print(f"\n{INFO_STYLE}Package Information:{RESET_STYLE}")
+    info_commands = [
+        ("ligma <pkg> ?v", "Show package version"),
+        ("ligma <pkg> ?version", "Show package version"),
+        ("ligma <pkg> ?i", "Show full package information"),
+        ("ligma <pkg> ?info", "Show full package information")
+    ]
+    for cmd, desc in info_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+    
+    # Help
+    print(f"\n{INFO_STYLE}Help:{RESET_STYLE}")
+    help_commands = [
+        ("ligma ?h", "Show this help"),
+        ("ligma ?help", "Show this help")
+    ]
+    for cmd, desc in help_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+    
+    print(f"\n{header_sth}╚{'═' * 58}╝{RESET_STYLE}")
+
+# Keep this for backward compatibility, redirects to the new browse_packages function
+def list_packages():
+    """Redirects to browse_packages for backward compatibility"""
+    browse_packages()
 
 def download_package(package_name):
     if not os.path.exists(PACKAGES_DIR):
