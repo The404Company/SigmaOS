@@ -5,7 +5,7 @@ This module handles all package management functionality for SigmaOS.
 """
 
 # Ligma package manager version
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 import os
 import sys
@@ -21,8 +21,15 @@ from zipfile import ZipFile
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Configuration
-REPO_URL = "https://github.com/The404Company/SigmaOS-packages"
+OFFICIAL_REPO = "The404Company/SigmaOS-packages"
+REPO_URL = f"https://github.com/{OFFICIAL_REPO}"
 PACKAGES_DIR = os.path.join(CURRENT_DIR, "packages")
+SOURCES_FILE = os.path.join(CURRENT_DIR, "ligma.sigs")
+
+# Verified external sources list - curated list of trusted package repositories
+VERIFIED_SOURCES = [
+    # Add verified sources here
+]
 
 # Try to import colorama for styling
 try:
@@ -106,15 +113,40 @@ def loading_animation(message, duration=2, task=None):
             time.sleep(duration)
             print(f"{SUCCESS_STYLE}✓ {message}{RESET_STYLE}")
 
-def get_github_file_content(package_name, filename):
-    """Fetch raw file content from GitHub"""
-    url = f"https://raw.githubusercontent.com/The404Company/SigmaOS-packages/main/{package_name}/{filename}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.text.strip()
-    except:
-        pass
+def get_github_file_content(package_name, filename, source=None):
+    """Fetch raw file content from GitHub
+    
+    Args:
+        package_name (str): Name of the package
+        filename (str): Name of the file to fetch
+        source (str, optional): Specific source to check. If None, checks all sources.
+    """
+    if source:
+        # Check specific source
+        url = f"https://raw.githubusercontent.com/{source}/main/{package_name}/{filename}"
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.text.strip()
+        except:
+            pass
+        return None
+        
+    # Check all configured sources
+    sources = load_sources()
+    # Try official repo first
+    if OFFICIAL_REPO in sources:
+        sources.remove(OFFICIAL_REPO)
+        sources.insert(0, OFFICIAL_REPO)
+    
+    for src in sources:
+        url = f"https://raw.githubusercontent.com/{src}/main/{package_name}/{filename}"
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.text.strip()
+        except:
+            continue
     return None
 
 def parse_description_file(content):
@@ -145,8 +177,14 @@ def parse_description_file(content):
                 
     return sections
 
-def get_package_description(package_name, installed=True):
-    """Get package description from local file or GitHub"""
+def get_package_description(package_name, source=None, installed=True):
+    """Get package description from local file or GitHub
+    
+    Args:
+        package_name (str): Name of the package
+        source (str, optional): Specific source to check for online content
+        installed (bool): Whether to check local installation first
+    """
     if installed and is_valid_package(package_name):
         desc_file = os.path.join(PACKAGES_DIR, package_name, "description.txt")
         try:
@@ -155,11 +193,11 @@ def get_package_description(package_name, installed=True):
                     return parse_description_file(f.read())
         except:
             pass
-    else:
-        # Try to fetch from GitHub for non-installed packages
-        content = get_github_file_content(package_name, "description.txt")
-        if content:
-            return parse_description_file(content)
+    
+    # Try to fetch from GitHub for non-installed packages
+    content = get_github_file_content(package_name, "description.txt", source=source)
+    if content:
+        return parse_description_file(content)
     
     return {'description': 'No description available', 'author': 'Unknown', 'version': '0.0', 'requirements': []}
 
@@ -250,13 +288,37 @@ def search_packages(search_term):
     if os.path.exists(PACKAGES_DIR):
         installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
                             if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
-                            and not d.startswith('.') 
-                            and d != "SigmaOS-packages-main"]
+                            and not d.startswith('.')]
     
-    # Get available packages from repo
-    headers = {'Accept': 'application/vnd.github.v3+json'}
-    print(f"{INFO_STYLE}Searching packages for '{search_term}'...{RESET_STYLE}")
-    response = requests.get(f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/", headers=headers)
+    # Search all configured sources
+    sources = load_sources()
+    if OFFICIAL_REPO in sources:
+        sources.remove(OFFICIAL_REPO)
+        sources.insert(0, OFFICIAL_REPO)  # Search official repo first
+        
+    found_packages = {}  # Use dict to avoid duplicates, store source info
+    
+    for source in sources:
+        print(f"{INFO_STYLE}Searching in {source}...{RESET_STYLE}")
+        headers = {'Accept': 'application/vnd.github.v3+json'}
+        response = requests.get(f"https://api.github.com/repos/{source}/contents/", headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            package_names = [item["name"] for item in data 
+                           if item["type"] == "dir" and not item["name"].startswith('.')]
+            
+            # First check name matches
+            for pkg in package_names:
+                if search_term in pkg.lower() and pkg not in found_packages:
+                    found_packages[pkg] = source
+            
+            # Then check descriptions
+            for pkg in package_names:
+                if pkg not in found_packages:  # Skip if already found by name
+                    desc = get_package_description(pkg, source=source, installed=(pkg in installed_packages))
+                    if search_term in desc['description'].lower():
+                        found_packages[pkg] = source
     
     try:
         # Try to get styles from SigmaOS if available
@@ -267,105 +329,115 @@ def search_packages(search_term):
         description_sth = RESET_STYLE
         package_status_sth = INFO_STYLE
     
-    if response.status_code == 200:
-        data = response.json()
-        package_names = [item["name"] for item in data 
-                       if item["type"] == "dir" and not item["name"].startswith('.')]
+    if found_packages:
+        print(f"\n{SUCCESS_STYLE}Found {len(found_packages)} package(s) matching '{search_term}':{RESET_STYLE}")
         
-        matches = []
-        
-        # First quick check for name matches
-        name_matches = [pkg for pkg in package_names if search_term in pkg.lower()]
-        matches.extend(name_matches)
-        
-        # Then check descriptions for any remaining packages
-        for pkg in package_names:
-            if pkg not in name_matches:
-                desc = get_package_description(pkg, installed=(pkg in installed_packages))
-                if search_term in desc['description'].lower():
-                    matches.append(pkg)
-        
-        # Remove duplicates
-        matches = list(set(matches))
-        
-        if matches:
-            print(f"\n{SUCCESS_STYLE}Found {len(matches)} package(s) matching '{search_term}':{RESET_STYLE}")
+        for pkg, source in found_packages.items():
+            is_installed = pkg in installed_packages
+            status = f"{SUCCESS_STYLE}[Installed]{RESET_STYLE}" if is_installed else f"{WARNING_STYLE}[Available]{RESET_STYLE}"
+            source_text = f"{INFO_STYLE}[{source}]{RESET_STYLE}"
             
-            for i, pkg in enumerate(matches):
+            desc = get_package_description(pkg, source=source, installed=is_installed)
+            print(f"\n{package_sth}{pkg} {status} {source_text}")
+            print(f"{description_sth}{desc['description']}")
+            print(f"{package_status_sth}Author: {desc['author']} - Version: {desc['version']}")
+    else:
+        print(f"{WARNING_STYLE}No packages found matching '{search_term}'{RESET_STYLE}")
+
+def browse_source(source):
+    """Browse packages from a specific source repository
+    
+    Args:
+        source (str): The source repository in format username/repo
+    """
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import (
+            package_sth, description_sth, package_status_sth, command_sth,
+            header_sth, SUCCESS_STYLE, WARNING_STYLE, ERROR_STYLE, INFO_STYLE
+        )
+    except ImportError:
+        # Fallback styles
+        package_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        package_status_sth = INFO_STYLE
+        command_sth = SUCCESS_STYLE
+        header_sth = INFO_STYLE
+    
+    try:
+        # Get installed packages first for status tracking
+        installed_packages = []
+        if os.path.exists(PACKAGES_DIR):
+            installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
+                               if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
+                               and not d.startswith('.')]
+
+        # Get packages from the specified source
+        headers = {'Accept': 'application/vnd.github.v3+json'}
+        response = requests.get(f"https://api.github.com/repos/{source}/contents/", headers=headers)
+        loading_animation(f"Fetching packages from {source}...")
+
+        if response.status_code == 200:
+            data = response.json()
+            available_packages = [item["name"] for item in data 
+                               if item["type"] == "dir" and not item["name"].startswith('.')]
+
+            if not available_packages:
+                print(f"{WARNING_STYLE}No packages found in {source}.{RESET_STYLE}")
+                return
+
+            print(f"\n{INFO_STYLE}Available packages in {source}:{RESET_STYLE}")
+            for i, pkg in enumerate(available_packages):
                 if i > 0:  # Add empty line before each package except the first one
                     print()
-                
-                is_installed = pkg in installed_packages
-                status = f"{SUCCESS_STYLE}[Installed]{RESET_STYLE}" if is_installed else f"{WARNING_STYLE}[Available]{RESET_STYLE}"
-                
-                desc = get_package_description(pkg, installed=is_installed)
-                print(f"{package_sth}{pkg} {status} {description_sth}- {desc['description']}")
-                print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
+                try:
+                    # Try to get package description from this source
+                    desc_url = f"https://raw.githubusercontent.com/{source}/main/{pkg}/description.txt"
+                    desc_response = requests.get(desc_url)
+                    if desc_response.status_code == 200:
+                        desc = parse_description_file(desc_response.text)
+                        status = f"{SUCCESS_STYLE}[Installed]{RESET_STYLE}" if pkg in installed_packages else f"{WARNING_STYLE}[Available]{RESET_STYLE}"
+                        print(f"{package_sth}{pkg} {status} {description_sth}- {desc['description']}")
+                        print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
+                    else:
+                        print(f"{package_sth}{pkg} {WARNING_STYLE}[No description available]{RESET_STYLE}")
+                except Exception as e:
+                    print(f"{package_sth}{pkg} {ERROR_STYLE}[Error: {str(e)}]{RESET_STYLE}")
         else:
-            print(f"{WARNING_STYLE}No packages found matching '{search_term}'{RESET_STYLE}")
-    else:
-        print(f"{ERROR_STYLE}Error searching packages. Status code: {response.status_code}{RESET_STYLE}")
+            print(f"{ERROR_STYLE}Error fetching from {source}. Status code: {response.status_code}{RESET_STYLE}")
+            if response.status_code == 404:
+                print(f"{INFO_STYLE}Repository may not exist or may be private.{RESET_STYLE}")
+    except Exception as e:
+        print(f"{ERROR_STYLE}Error browsing source {source}: {e}{RESET_STYLE}")
 
 def browse_packages():
-    """Browse all available packages (formerly list_packages)"""
-    # Get installed packages first
-    installed_packages = []
-    if os.path.exists(PACKAGES_DIR):
-        installed_packages = [d for d in os.listdir(PACKAGES_DIR) 
-                            if os.path.isdir(os.path.join(PACKAGES_DIR, d)) 
-                            and not d.startswith('.') 
-                            and d != "SigmaOS-packages-main"]
-
-    # Get available packages from repo
-    headers = {'Accept': 'application/vnd.github.v3+json'}
-    response = requests.get(f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/", headers=headers)
-    loading_animation("Fetching packages...")
+    """Browse available packages"""
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import (
+            command_sth, description_sth, header_sth,
+            SUCCESS_STYLE, WARNING_STYLE, ERROR_STYLE, INFO_STYLE
+        )
+    except ImportError:
+        # Fallback styles
+        command_sth = SUCCESS_STYLE
+        description_sth = RESET_STYLE
+        header_sth = INFO_STYLE
     
-    if response.status_code == 200:
-        data = response.json()
-        available_packages = [item["name"] for item in data 
-                            if item["type"] == "dir" and not item["name"].startswith('.')]
-        
-        try:
-            # Try to get styles from SigmaOS if available
-            from SigmaOS import package_sth, description_sth, package_status_sth, SUCCESS_STYLE, WARNING_STYLE, ERROR_STYLE
-        except ImportError:
-            # Fallback styles
-            package_sth = SUCCESS_STYLE
-            description_sth = RESET_STYLE
-            package_status_sth = INFO_STYLE
-        
-        print(f"\n{INFO_STYLE}Available packages:{RESET_STYLE}")
-        packages_found = False
-        
-        # Show installed packages first
-        if installed_packages:
-            print(f"\n{SUCCESS_STYLE}Installed:{RESET_STYLE}")
-            for i, pkg in enumerate(installed_packages):
-                if i > 0:  # Add empty line before each package except the first one
-                    print()
-                desc = get_package_description(pkg)
-                print(f"{package_sth}{pkg} {description_sth}- {desc['description']}")
-                print(f"{package_status_sth}{desc['author']} {description_sth}- v{desc['version']}")
-                packages_found = True
-        
-        # Show available but not installed packages
-        not_installed = [pkg for pkg in available_packages if pkg not in installed_packages]
-        if not_installed:
-            print(f"\n{WARNING_STYLE}Not Installed:{RESET_STYLE}")
-            for i, pkg in enumerate(not_installed):
-                if i > 0:  # Add empty line before each package except the first one
-                    print()
-                desc = get_package_description(pkg, installed=False)
-                print(f"{description_sth}{pkg} - {desc['description']}")
-                print(f"{package_status_sth}{desc['author']} - v{desc['version']}")
-                packages_found = True
-        
-        if not packages_found:
-            print(f"{ERROR_STYLE}No packages found in repository.{RESET_STYLE}")
-    else:
-        print(f"{ERROR_STYLE}Error fetching repositories. Status code: {response.status_code}{RESET_STYLE}")
-        print(f"{ERROR_STYLE}Response: {response.text}{RESET_STYLE}")
+    sources = load_sources()
+    
+    if len(sources) > 1:
+        # Multiple sources configured
+        print(f"{INFO_STYLE}Use one of these commands to browse packages:{RESET_STYLE}")
+        print(f"{command_sth}  ligma browse official{description_sth}      - Browse the official repository")
+        print(f"{command_sth}  ligma browse <user>/<repo>{description_sth} - Browse a specific source")
+        print(f"\n{INFO_STYLE}Available sources:{RESET_STYLE}")
+        for source in sources:
+            print(f"{description_sth}  ▶ {source}")
+        return
+    
+    # If only official source is configured, show its packages directly
+    browse_source(OFFICIAL_REPO)
 
 def show_ligma_version():
     """Display the ligma package manager version"""
@@ -437,6 +509,19 @@ def show_ligma_help():
     for cmd, desc in update_commands:
         print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
     
+    # Source Management
+    print(f"\n{INFO_STYLE}Source Management:{RESET_STYLE}")
+    source_commands = [
+        ("ligma src add <user>/<repo>", "Add a package source"),
+        ("ligma src remove <user>/<repo>", "Remove a package source"),
+        ("ligma src list", "List all package sources"),
+        ("ligma src verified", "Show verified package sources"),
+        ("ligma browse official", "Browse official package repository"),
+        ("ligma browse <user>/<repo>", "Browse a specific source repository")
+    ]
+    for cmd, desc in source_commands:
+        print(f"{command_sth}  {cmd:<30}{description_sth} - {desc}")
+
     # Help
     print(f"\n{INFO_STYLE}Help and Version:{RESET_STYLE}")
     help_commands = [
@@ -455,9 +540,68 @@ def list_packages():
     """Redirects to browse_packages for backward compatibility"""
     browse_packages()
 
+def try_download_from_source(package_name, source, package_dir, headers, is_update=False):
+    """Try to download a package from a specific source"""
+    package_url = f"https://api.github.com/repos/{source}/contents/{package_name}"
+    try:
+        response = requests.get(package_url, headers=headers)
+        if response.status_code != 200:
+            return False, 0, 0
+
+        files_data = response.json()
+        download_count = 0
+        error_count = 0
+
+        for file_info in files_data:
+            if file_info['type'] == 'file':
+                file_name = file_info['name']
+                download_url = file_info['download_url']
+                try:
+                    file_response = requests.get(download_url)
+                    if file_response.status_code == 200:
+                        file_path = os.path.join(package_dir, file_name)
+                        with open(file_path, 'wb') as f:
+                            f.write(file_response.content)
+                        download_count += 1
+                    else:
+                        error_count += 1
+                except:
+                    error_count += 1
+            elif file_info['type'] == 'dir':
+                subdir_name = file_info['name']
+                subdir_path = os.path.join(package_dir, subdir_name)
+                os.makedirs(subdir_path, exist_ok=True)
+                subdir_url = file_info['url']
+                
+                try:
+                    subdir_response = requests.get(subdir_url, headers=headers)
+                    if subdir_response.status_code == 200:
+                        subdir_files = subdir_response.json()
+                        for subfile in subdir_files:
+                            if subfile['type'] == 'file':
+                                subfile_name = subfile['name']
+                                subfile_download_url = subfile['download_url']
+                                try:
+                                    subfile_response = requests.get(subfile_download_url)
+                                    if subfile_response.status_code == 200:
+                                        subfile_path = os.path.join(subdir_path, subfile_name)
+                                        with open(subfile_path, 'wb') as f:
+                                            f.write(subfile_response.content)
+                                        download_count += 1
+                                    else:
+                                        error_count += 1
+                                except:
+                                    error_count += 1
+                except:
+                    pass
+
+        return True, download_count, error_count
+    except:
+        return False, 0, 0
+
 def download_package(package_name, is_update=False):
     """
-    Download and install a package
+    Download and install a package from any configured source
     
     Args:
         package_name (str): Name of the package to download
@@ -484,122 +628,62 @@ def download_package(package_name, is_update=False):
             log_error(f"Error removing package directory for update", exception=e)
             return False
 
-    # Direct download URL for the specific package
-    package_url = f"https://api.github.com/repos/The404Company/SigmaOS-packages/contents/{package_name}"
-    
-    try:
-        # First get the content listing for the package directory
-        print(f"{INFO_STYLE}Downloading {package_name}...{RESET_STYLE}")
-        headers = {'Accept': 'application/vnd.github.v3+json'}
-        response = requests.get(package_url, headers=headers)
+    # Try sources in order: official first, then additional sources
+    sources = load_sources()
+    if OFFICIAL_REPO in sources:
+        sources.remove(OFFICIAL_REPO)
+        sources.insert(0, OFFICIAL_REPO)  # Ensure official repo is first
+
+    headers = {'Accept': 'application/vnd.github.v3+json'}
+    os.makedirs(package_dir, exist_ok=True)
+
+    for source in sources:
+        print(f"{INFO_STYLE}Trying source: {source}...{RESET_STYLE}")
+        success, download_count, error_count = try_download_from_source(
+            package_name, source, package_dir, headers, is_update
+        )
         
-        if response.status_code != 200:
-            print(f"{ERROR_STYLE}Error getting package files. Status code: {response.status_code}{RESET_STYLE}")
-            log_error(f"Error getting package files. Status code: {response.status_code}")
-            return False
+        if success:
+            # Verify the package has the necessary files
+            if not os.path.exists(os.path.join(package_dir, "main.py")):
+                print(f"{WARNING_STYLE}Warning: main.py not found in package. This package might not be runnable.{RESET_STYLE}")
             
-        files_data = response.json()
-        
-        # Create package directory
-        os.makedirs(package_dir, exist_ok=True)
-        
-        # Download each file in the package
-        download_count = 0
-        error_count = 0
-        
-        for file_info in files_data:
-            if file_info['type'] == 'file':
-                file_name = file_info['name']
-                download_url = file_info['download_url']
-                
-                try:
-                    file_response = requests.get(download_url)
-                    if file_response.status_code == 200:
-                        file_path = os.path.join(package_dir, file_name)
-                        with open(file_path, 'wb') as f:
-                            f.write(file_response.content)
-                        download_count += 1
+            # Install package requirements
+            desc = get_package_description(package_name, installed=True)
+            if desc['requirements']:
+                print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
+                log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
+                core_libs = {"colorama", "requests", "datetime", "json"}
+                for req in desc['requirements']:
+                    if req.lower() in core_libs:
+                        print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
+                        log_info(f"Skipping requirement {req} (core library)")
                     else:
-                        print(f"{WARNING_STYLE}Error downloading {file_name}: Status code {file_response.status_code}{RESET_STYLE}")
-                        error_count += 1
-                except Exception as e:
-                    print(f"{WARNING_STYLE}Error downloading {file_name}: {e}{RESET_STYLE}")
-                    error_count += 1
-            elif file_info['type'] == 'dir':
-                # Handle subdirectories
-                subdir_name = file_info['name']
-                subdir_path = os.path.join(package_dir, subdir_name)
-                os.makedirs(subdir_path, exist_ok=True)
-                
-                # Get subdirectory contents
-                subdir_url = file_info['url']
-                try:
-                    subdir_response = requests.get(subdir_url, headers=headers)
-                    if subdir_response.status_code == 200:
-                        subdir_files = subdir_response.json()
-                        
-                        for subfile in subdir_files:
-                            if subfile['type'] == 'file':
-                                subfile_name = subfile['name']
-                                subfile_download_url = subfile['download_url']
-                                
-                                try:
-                                    subfile_response = requests.get(subfile_download_url)
-                                    if subfile_response.status_code == 200:
-                                        subfile_path = os.path.join(subdir_path, subfile_name)
-                                        with open(subfile_path, 'wb') as f:
-                                            f.write(subfile_response.content)
-                                        download_count += 1
-                                    else:
-                                        print(f"{WARNING_STYLE}Error downloading {subdir_name}/{subfile_name}: Status code {subfile_response.status_code}{RESET_STYLE}")
-                                        error_count += 1
-                                except Exception as e:
-                                    print(f"{WARNING_STYLE}Error downloading {subdir_name}/{subfile_name}: {e}{RESET_STYLE}")
-                                    error_count += 1
-                    else:
-                        print(f"{WARNING_STYLE}Error getting subdirectory {subdir_name} contents: Status code {subdir_response.status_code}{RESET_STYLE}")
-                except Exception as e:
-                    print(f"{WARNING_STYLE}Error processing subdirectory {subdir_name}: {e}{RESET_STYLE}")
-        
-        # Verify the package has the necessary files
-        if not os.path.exists(os.path.join(package_dir, "main.py")):
-            print(f"{WARNING_STYLE}Warning: main.py not found in package. This package might not be runnable.{RESET_STYLE}")
-        
-        # Install package requirements
-        desc = get_package_description(package_name, installed=True)
-        if desc['requirements']:
-            print(f"\n{INFO_STYLE}Installing dependencies...{RESET_STYLE}")
-            log_info(f"Installing dependencies for {package_name}: {desc['requirements']}")
-            core_libs = {"colorama", "requests", "datetime", "json"}
-            for req in desc['requirements']:
-                if req.lower() in core_libs:
-                    print(f"{WARNING_STYLE}Skipping {req} (already included in SigmaOS).{RESET_STYLE}")
-                    log_info(f"Skipping requirement {req} (core library)")
-                else:
-                    try:
-                        loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
-                            [sys.executable, "-m", "pip", "install", req], 
-                            stdout=subprocess.DEVNULL, 
-                            stderr=subprocess.DEVNULL
-                        ))
-                        log_info(f"Installed requirement {req}")
-                    except Exception as e:
-                        print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
-                        log_error(f"Error installing requirement {req}", exception=e)
-        
-        # Report results
-        if error_count == 0:
-            print(f"{SUCCESS_STYLE}Package {package_name} successfully {'updated' if is_update else 'installed'}.{RESET_STYLE}")
-            log_info(f"Package {package_name} successfully {'updated' if is_update else 'installed'}. Downloaded {download_count} files.")
-            return True
-        else:
-            print(f"{WARNING_STYLE}Package {package_name} {'updated' if is_update else 'installed'} with {error_count} errors. Some functionality may be limited.{RESET_STYLE}")
-            log_warning(f"Package {package_name} {'updated' if is_update else 'installed'} with {error_count} errors.")
-            return True
-    except Exception as e:
-        print(f"{ERROR_STYLE}Error {'updating' if is_update else 'installing'} package {package_name}: {e}{RESET_STYLE}")
-        log_error(f"Error {'updating' if is_update else 'installing'} package {package_name}", exception=e)
-        return False
+                        try:
+                            loading_animation(f"Installing {req}", task=lambda req=req: subprocess.run(
+                                [sys.executable, "-m", "pip", "install", req], 
+                                stdout=subprocess.DEVNULL, 
+                                stderr=subprocess.DEVNULL
+                            ))
+                            log_info(f"Installed requirement {req}")
+                        except Exception as e:
+                            print(f"{ERROR_STYLE}Error installing {req}: {e}{RESET_STYLE}")
+                            log_error(f"Error installing requirement {req}", exception=e)
+            
+            # Report results
+            if error_count == 0:
+                print(f"{SUCCESS_STYLE}Package {package_name} successfully {'updated' if is_update else 'installed'} from {source}.{RESET_STYLE}")
+                log_info(f"Package {package_name} successfully {'updated' if is_update else 'installed'}. Downloaded {download_count} files.")
+                return True
+            else:
+                print(f"{WARNING_STYLE}Package {package_name} {'updated' if is_update else 'installed'} from {source} with {error_count} errors. Some functionality may be limited.{RESET_STYLE}")
+                log_warning(f"Package {package_name} {'updated' if is_update else 'installed'} with {error_count} errors.")
+                return True
+
+    # If we get here, no source had the package
+    print(f"{ERROR_STYLE}Package {package_name} not found in any configured source.{RESET_STYLE}")
+    log_error(f"Package {package_name} not found in any source")
+    return False
 
 def uninstall_package(package_name):
     """Uninstall a package by removing its directory"""
@@ -916,4 +1000,119 @@ def update_package(package_name):
             return False
     
     # Proceed with the update
-    return download_package(package_name, is_update=True) 
+    return download_package(package_name, is_update=True)
+
+# Load and save source configurations
+def load_sources():
+    """Load package sources from ligma.sigs file"""
+    if not os.path.exists(SOURCES_FILE):
+        # Create default sources file with just the official repo
+        save_sources([OFFICIAL_REPO])
+        return [OFFICIAL_REPO]
+    try:
+        with open(SOURCES_FILE, 'r') as f:
+            sources = json.load(f)
+            if not isinstance(sources, list):
+                return [OFFICIAL_REPO]
+            return sources
+    except Exception as e:
+        log_error(f"Error loading sources", exception=e)
+        return [OFFICIAL_REPO]
+
+def save_sources(sources):
+    """Save package sources to ligma.sigs file"""
+    try:
+        with open(SOURCES_FILE, 'w') as f:
+            json.dump(sources, f, indent=2)
+        return True
+    except Exception as e:
+        log_error(f"Error saving sources", exception=e)
+        return False
+
+def add_source(source):
+    """Add a new package source"""
+    try:
+        # Validate source format
+        if not '/' in source:
+            print(f"{ERROR_STYLE}Invalid source format. Use 'username/repo' format.{RESET_STYLE}")
+            return False
+            
+        # Verify the source repository exists
+        username, repo = source.split('/')
+        url = f"https://api.github.com/repos/{username}/{repo}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(f"{ERROR_STYLE}Repository not found or inaccessible: {source}{RESET_STYLE}")
+            return False
+
+        sources = load_sources()
+        if source in sources:
+            print(f"{WARNING_STYLE}Source {source} already exists.{RESET_STYLE}")
+            return False
+            
+        sources.append(source)
+        if save_sources(sources):
+            print(f"{SUCCESS_STYLE}Added source: {source}{RESET_STYLE}")
+            return True
+        return False
+    except Exception as e:
+        log_error(f"Error adding source", exception=e)
+        return False
+
+def remove_source(source):
+    """Remove a package source"""
+    if source == OFFICIAL_REPO:
+        print(f"{ERROR_STYLE}Cannot remove the official package repository.{RESET_STYLE}")
+        return False
+        
+    sources = load_sources()
+    if source not in sources:
+        print(f"{WARNING_STYLE}Source not found: {source}{RESET_STYLE}")
+        return False
+        
+    sources.remove(source)
+    if save_sources(sources):
+        print(f"{SUCCESS_STYLE}Removed source: {source}{RESET_STYLE}")
+        return True
+    return False
+
+def list_sources():
+    """List all configured package sources"""
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import header_sth, description_sth, SUCCESS_STYLE, INFO_STYLE, WARNING_STYLE
+    except ImportError:
+        # Fallback styles
+        header_sth = INFO_STYLE
+        description_sth = RESET_STYLE
+    
+    sources = load_sources()
+    print(f"\n{header_sth}Package Sources:{RESET_STYLE}")
+    
+    print(f"\n{INFO_STYLE}Official Repository:{RESET_STYLE}")
+    print(f"{SUCCESS_STYLE}  ▶ {OFFICIAL_REPO} (official){RESET_STYLE}")
+    
+    other_sources = [s for s in sources if s != OFFICIAL_REPO]
+    if other_sources:
+        print(f"\n{INFO_STYLE}Additional Sources:{RESET_STYLE}")
+        for source in other_sources:
+            print(f"{description_sth}  ▶ {source}")
+    else:
+        print(f"\n{WARNING_STYLE}No additional sources configured.{RESET_STYLE}")
+
+def show_verified_sources():
+    """Show list of verified external sources"""
+    try:
+        # Try to get styles from SigmaOS if available
+        from SigmaOS import header_sth, SUCCESS_STYLE, WARNING_STYLE, INFO_STYLE
+    except ImportError:
+        # Fallback styles
+        header_sth = INFO_STYLE
+    
+    print(f"\n{header_sth}Verified Package Sources:{RESET_STYLE}")
+    if VERIFIED_SOURCES:
+        for source in VERIFIED_SOURCES:
+            print(f"{SUCCESS_STYLE}  ▶ {source}{RESET_STYLE}")
+    else:
+        print(f"{WARNING_STYLE}No verified sources available yet.{RESET_STYLE}")
+    print(f"\n{INFO_STYLE}Note: Verified sources are curated and trusted package repositories.{RESET_STYLE}")

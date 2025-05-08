@@ -13,7 +13,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 - Logging system (per-session logs in `/logs`)
 - Splash screen and system diagnostics
 - Built-in help and onboarding
-- Essential packages: DoccX, LigmaDev, LigmaUpdate, SigmaUpdate, Sucker, Sourcerer, RhoSecure, OmegaNet, XiAI, BetaTask, yapper
+- Essential packages: `DoccX`, `SigmaUpdate`, `Sucker`, `RhoSecure`, `yapper`, `sigma`
 
 ---
 

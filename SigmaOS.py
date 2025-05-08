@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 # Define basic console colors for early use before colorama is loaded
 try:
@@ -25,6 +25,22 @@ try:
     WARNING_STYLE = Fore.YELLOW
     INFO_STYLE = Fore.CYAN
     RESET_STYLE = Style.RESET_ALL
+    
+    # Theme-based styles with defaults
+    banner_sth = Fore.CYAN
+    command_sth = Fore.GREEN
+    version_sth = Fore.YELLOW
+    description_sth = Style.RESET_ALL
+    header_sth = Fore.YELLOW
+    package_sth = Fore.GREEN
+    package_status_sth = Fore.CYAN
+    prompt_sth = Fore.GREEN
+    loading_sth = Fore.CYAN
+    suggestion_sth = Fore.CYAN
+    relevance_sth = Fore.BLUE
+    system_info_sth = Fore.YELLOW
+    timer_sth = Fore.GREEN
+    alias_sth = Fore.GREEN
 except ImportError:
     # Fallback if colorama isn't installed yet
     SUCCESS_STYLE = ""
@@ -32,6 +48,22 @@ except ImportError:
     WARNING_STYLE = ""
     INFO_STYLE = ""
     RESET_STYLE = ""
+    
+    # Theme-based styles with empty defaults
+    banner_sth = ""
+    command_sth = ""
+    version_sth = ""
+    description_sth = ""
+    header_sth = ""
+    package_sth = ""
+    package_status_sth = ""
+    prompt_sth = ""
+    loading_sth = ""
+    suggestion_sth = ""
+    relevance_sth = ""
+    system_info_sth = ""
+    timer_sth = ""
+    alias_sth = ""
 
 # Global variable for log file
 LOG_FILE = None
@@ -41,7 +73,7 @@ def check_and_download_ligma(force_update=False):
     """Check if ligma.py exists, download it if not, or update it if outdated"""
     ligma_path = os.path.join(os.path.dirname(__file__), "ligma.py")
     ligma_url = "https://raw.githubusercontent.com/The404Company/SigmaOS/main/ligma.py"
-    
+
     try:
         # Check if file exists
         if not os.path.exists(ligma_path) or force_update:
@@ -76,6 +108,7 @@ def check_and_download_ligma(force_update=False):
     except Exception as e:
         print(f"{ERROR_STYLE}Error handling ligma.py: {e}{RESET_STYLE}")
         return False
+
 
 # Enhanced logging system
 def log(message, level="INFO", print_to_console=False, traceback=None):
@@ -399,7 +432,12 @@ def load_ligma_module():
             'check_all_updates',
             'get_package_version',
             'show_package_info',
-            'update_package'
+            'update_package',
+            'list_sources',
+            'show_verified_sources',
+            'add_source',
+            'remove_source',
+            'browse_source'
         ]
         
         for func in required_functions:
@@ -661,7 +699,7 @@ ALL_COMMANDS = {
     'clear': [],
     'setup': [],
     'reset': [],
-    'ligma': ['list', 'install', 'uninstall', 'browse', 'search', '?v', '?version', '?i', '?info', '?h', '?help'],
+    'ligma': ['list', 'install', 'uninstall', 'browse', 'search', '?v', '?version', '?i', '?info', '?h', '?help', 'src'],
     'alias': ['list', 'add', 'remove'],
     'sysinfo': [],
     'now': [],
@@ -737,7 +775,7 @@ def add_alias(name, command):
 def remove_alias(name):
     aliases = load_aliases()
     if name in aliases:
-        del aliases[name]
+        del aliases
         save_aliases(aliases)
         print(f"{SUCCESS_STYLE}Removed alias: {name}{RESET_STYLE}")
     else:
@@ -797,6 +835,10 @@ def show_help():
         ("ligma <pkg> ?v", "Show package version"),
         ("ligma <pkg> ?i", "Show package info"),
         ("ligma ?help", "Show ligma help"),
+        ("ligma src list", "List package sources"),
+        ("ligma src verified", "Show verified sources"),
+        ("ligma src add <user/repo>", "Add a new source"),
+        ("ligma src remove <user/repo>", "Remove a source"),
         ("<package>", "Run a package directly")
     ]
     for cmd, desc in pkg_commands:
@@ -962,7 +1004,7 @@ def send_logs_to_discord():
         log_warning("Not all logs were sent successfully, keeping log files")
 
 def setup_essential_packages():
-    essential_packages = ["LigmaUpdate", "SigmaUpdate", "yapper", "DoccX"]
+    essential_packages = ["SigmaUpdate", "yapper", "DoccX", "sigma"]
     
     print(f"\n{INFO_STYLE}Installing essential packages...{RESET_STYLE}")
     log_info("Starting setup of essential packages")
@@ -1194,7 +1236,7 @@ def show_welcome_message():
         print(f"{command_sth}To get started, try these commands:")
         print(f"{SUCCESS_STYLE}  setup{description_sth}     - Install essential packages")
         print(f"{SUCCESS_STYLE}  help{description_sth}      - Show all available commands")
-        print(f"{SUCCESS_STYLE}  ligma list{description_sth} - Show available packages\n")
+        print(f"{SUCCESS_STYLE}  ligma ?help{description_sth} - Show help information for ligma\n")
 
 def suggest_command(command):
     """Enhanced command suggestions with inline display"""
@@ -1221,7 +1263,11 @@ def suggest_command(command):
         "theme edit": "Edit theme colors",
         "theme create": "Create a new theme",
         "theme delete": "Delete a theme",
-        "theme show": "Show theme contents"
+        "theme show": "Show theme contents",
+        "ligma src list": "List package sources",
+        "ligma src verified": "Show verified sources",
+        "ligma src add": "Add a new source",
+        "ligma src remove": "Remove a source"
     }
 
     # Get close matches for the command
@@ -1634,6 +1680,89 @@ def force_update_ligma():
         print(f"{ERROR_STYLE}Failed to update ligma.py.{RESET_STYLE}")
         log_error("Failed to update ligma.py")
 
+def handle_ligma(args):
+    if ligma_module is None:
+        print(f"{ERROR_STYLE}Ligma module not available. Try restarting SigmaOS or running 'update-ligma'.{RESET_STYLE}")
+        return
+        
+    if args:
+        subcommand = args[0]
+        # Source management commands
+        if subcommand == "src" and len(args) >= 2:
+            action = args[1]
+            if action == "list":
+                ligma_module.list_sources()
+            elif action == "verified":
+                ligma_module.show_verified_sources()
+            elif action == "add" and len(args) == 3:
+                ligma_module.add_source(args[2])
+            elif action == "remove" and len(args) == 3:
+                ligma_module.remove_source(args[2])
+            else:
+                print(f"{ERROR_STYLE}Invalid source command. Use 'ligma src list|verified|add <user/repo>|remove <user/repo>'{RESET_STYLE}")
+            return
+        
+        # Package browsing and installation
+        if subcommand == "list":
+            ligma_module.show_installed_packages()
+        elif subcommand == "browse":
+            if len(args) == 1:
+                ligma_module.browse_packages()
+            elif len(args) == 2:
+                if args[1] == "official":
+                    ligma_module.browse_source(ligma_module.OFFICIAL_REPO)
+                else:
+                    ligma_module.browse_source(args[1])
+        elif subcommand == "search" and len(args) >= 2:
+            search_term = " ".join(args[1:])
+            ligma_module.search_packages(search_term)
+        elif subcommand == "install":
+            if len(args) == 2:
+                ligma_module.download_package(args[1])
+            elif len(args) >= 3 and args[-1] == "?m":
+                packages_to_install = args[1:-1]
+                ligma_module.install_multiple_packages(packages_to_install)
+            else:
+                print(f"{ERROR_STYLE}Invalid install command. Use 'ligma install <pkg>' or 'ligma install <pkg1> <pkg2> ... ?m'{RESET_STYLE}")
+        elif subcommand == "uninstall" and len(args) == 2:
+            ligma_module.uninstall_package(args[1])
+        elif subcommand in ["?u", "?update"]:
+            # Check all packages for updates
+            ligma_module.check_all_updates()
+        elif subcommand in ["?v", "?version"]:
+            # Show ligma version
+            if hasattr(ligma_module, 'show_ligma_version'):
+                ligma_module.show_ligma_version()
+            else:
+                print(f"{ERROR_STYLE}Error: show_ligma_version function not found in ligma module.{RESET_STYLE}")
+                print(f"{INFO_STYLE}Try running 'update-ligma' to update the ligma module.{RESET_STYLE}")
+        elif subcommand in ["?h", "?help"]:
+            ligma_module.show_ligma_help()
+        elif len(args) == 2:
+            # Commands with package name and qualifier
+            package_name = args[0]
+            qualifier = args[1]
+            
+            if qualifier in ["?v", "?version"]:
+                ligma_module.get_package_version(package_name)
+            elif qualifier in ["?i", "?info"]:
+                ligma_module.show_package_info(package_name)
+            elif qualifier in ["?u", "?update"]:
+                ligma_module.update_package(package_name)
+            else:
+                print(f"{ERROR_STYLE}Unknown command: ligma {args[0]} {args[1]}{RESET_STYLE}")
+                print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
+        else:
+            print(f"{ERROR_STYLE}Unknown command for ligma: {subcommand}{RESET_STYLE}")
+            print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
+    else:
+        print(f"{INFO_STYLE}Available ligma commands:{RESET_STYLE}")
+        print(f"  ligma list              - List installed packages")
+        print(f"  ligma browse            - Browse available packages")
+        print(f"  ligma browse official   - Browse official repository")
+        print(f"  ligma src list          - List package sources")
+        print(f"  ligma ?help             - Show full help")
+
 def interactive_shell():
     # Exit if we're a subprocess instance
     if os.environ.get('SIGMAOS_SUBPROCESS') == '1':
@@ -1675,72 +1804,6 @@ def interactive_shell():
     
     def handle_update_ligma(args=None):
         force_update_ligma()
-    
-    def handle_ligma(args):
-        if ligma_module is None:
-            print(f"{ERROR_STYLE}Ligma module not available. Try restarting SigmaOS or running 'update-ligma'.{RESET_STYLE}")
-            return
-            
-        if args:
-            subcommand = args[0]
-            if subcommand == "list":
-                ligma_module.show_installed_packages()
-            elif subcommand == "browse":
-                ligma_module.browse_packages()
-            elif subcommand == "search" and len(args) >= 2:
-                search_term = " ".join(args[1:])
-                ligma_module.search_packages(search_term)
-            elif subcommand == "install":
-                if len(args) == 2:
-                    # Regular single package install
-                    ligma_module.download_package(args[1])
-                elif len(args) >= 3 and args[-1] == "?m":
-                    # Multiple package installation
-                    packages_to_install = args[1:-1]
-                    ligma_module.install_multiple_packages(packages_to_install)
-                else:
-                    print(f"{ERROR_STYLE}Invalid install command. Use 'ligma install <pkg>' or 'ligma install <pkg1> <pkg2> ... ?m'{RESET_STYLE}")
-            elif subcommand == "uninstall" and len(args) == 2:
-                ligma_module.uninstall_package(args[1])
-            elif subcommand in ["?u", "?update"]:
-                # Check all packages for updates
-                ligma_module.check_all_updates()
-            elif subcommand in ["?v", "?version"]:
-                # Show ligma version
-                if hasattr(ligma_module, 'show_ligma_version'):
-                    ligma_module.show_ligma_version()
-                else:
-                    print(f"{ERROR_STYLE}Error: show_ligma_version function not found in ligma module.{RESET_STYLE}")
-                    print(f"{INFO_STYLE}Try running 'update-ligma' to update the ligma module.{RESET_STYLE}")
-            elif subcommand in ["?h", "?help"]:
-                ligma_module.show_ligma_help()
-            elif len(args) == 2:
-                # Commands with package name and qualifier
-                package_name = args[0]
-                qualifier = args[1]
-                
-                if qualifier in ["?v", "?version"]:
-                    ligma_module.get_package_version(package_name)
-                elif qualifier in ["?i", "?info"]:
-                    ligma_module.show_package_info(package_name)
-                elif qualifier in ["?u", "?update"]:
-                    # Update specific package
-                    ligma_module.update_package(package_name)
-                else:
-                    print(f"{ERROR_STYLE}Unknown command: ligma {args[0]} {args[1]}{RESET_STYLE}")
-                    print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
-            else:
-                print(f"{ERROR_STYLE}Unknown command for ligma: {subcommand}{RESET_STYLE}")
-                print(f"{INFO_STYLE}Try 'ligma ?help' for available commands.{RESET_STYLE}")
-        else:
-            print(f"{INFO_STYLE}Available ligma commands:{RESET_STYLE}")
-            print(f"{command_sth}  list{description_sth}      - Show installed packages")
-            print(f"{command_sth}  browse{description_sth}    - Browse all available packages")
-            print(f"{command_sth}  search{description_sth}    - Search for packages")
-            print(f"{command_sth}  install{description_sth}   - Install a package")
-            print(f"{command_sth}  uninstall{description_sth} - Uninstall a package")
-            print(f"{command_sth}  ?help{description_sth}     - Show detailed help")
-            print(f"\n{INFO_STYLE}Use 'ligma ?help' for more detailed help.{RESET_STYLE}")
     
     def handle_alias(args):
         if not args:
