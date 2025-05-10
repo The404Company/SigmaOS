@@ -13,6 +13,15 @@ import uuid
 # Version number
 VERSION = "0.2.3"
 
+
+if platform.system() == 'Windows':
+    import keyboard # just an experimment.
+    try:
+        keyboard.press_and_release('f11')
+    except Exception as e:
+        print(f"Error simulating F11 press: {e}")
+
+
 # Define basic console colors for early use before colorama is loaded
 try:
     # First try to import colorama for basic styling
