@@ -26,7 +26,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 ---
 
 ## 🟠 Medium-Term Goals (v0.3.x)
-- [ ] **Remote Package Sources:** Add, remove, and prioritize multiple package sources (maybe beyond GitHub) inside SigmaOS itself
+- [x] **Remote Package Sources:** Add, remove, and prioritize multiple package sources (maybe beyond GitHub) inside SigmaOS itself
 - [ ] **Plugin Hooks:** Allow packages to hook into shell events (e.g., on startup, on command)
 
 ---
@@ -55,7 +55,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 
 ---
 
-*Last updated: 30/04/2025*
+*Last updated: 09/5/2025*
 
 ---
 

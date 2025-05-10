@@ -11,7 +11,7 @@ import importlib.util
 import uuid
 
 # Version number
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 # Define basic console colors for early use before colorama is loaded
 try:
@@ -76,17 +76,30 @@ def check_and_download_ligma(force_update=False):
 
     try:
         # Check if file exists
-        if not os.path.exists(ligma_path) or force_update:
-            print(f"{INFO_STYLE}{'Updating' if force_update else 'Downloading'} ligma.py from GitHub...{RESET_STYLE}")
+        if not os.path.exists(ligma_path):
+            print(f"{INFO_STYLE}Downloading ligma.py from GitHub...{RESET_STYLE}")
             response = requests.get(ligma_url)
             if response.status_code == 200:
                 with open(ligma_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
-                print(f"{SUCCESS_STYLE}ligma.py {'updated' if force_update else 'downloaded'} successfully.{RESET_STYLE}")
+                print(f"{SUCCESS_STYLE}ligma.py downloaded successfully.{RESET_STYLE}")
             else:
                 print(f"{ERROR_STYLE}Failed to download ligma.py. Status code: {response.status_code}{RESET_STYLE}")
                 return False
         else:
+            # If force_update is True, skip the check and update
+            if force_update:
+                print(f"{INFO_STYLE}Forcing ligma.py update...{RESET_STYLE}")
+                response = requests.get(ligma_url)
+                if response.status_code == 200:
+                    with open(ligma_path, "w", encoding="utf-8") as f:
+                        f.write(response.text)
+                    print(f"{SUCCESS_STYLE}ligma.py updated successfully.{RESET_STYLE}")
+                    return True
+                else:
+                    print(f"{ERROR_STYLE}Failed to update ligma.py. Status code: {response.status_code}{RESET_STYLE}")
+                    return False
+            
             # Check if file is up to date
             try:
                 response = requests.get(ligma_url)
@@ -96,10 +109,16 @@ def check_and_download_ligma(force_update=False):
                         current_content = f.read()
                     
                     if current_content != response.text:
-                        print(f"{INFO_STYLE}Updating ligma.py...{RESET_STYLE}")
-                        with open(ligma_path, "w", encoding="utf-8") as f:
-                            f.write(response.text)
-                        print(f"{SUCCESS_STYLE}ligma.py updated successfully.{RESET_STYLE}")
+                        print(f"{WARNING_STYLE}A new version of ligma.py is available.{RESET_STYLE}")
+                        confirm = input(f"{INFO_STYLE}Would you like to update the package manager? (y/N): {RESET_STYLE}")
+                        if confirm.lower() == 'y':
+                            print(f"{INFO_STYLE}Updating ligma.py...{RESET_STYLE}")
+                            with open(ligma_path, "w", encoding="utf-8") as f:
+                                f.write(response.text)
+                            print(f"{SUCCESS_STYLE}ligma.py updated successfully.{RESET_STYLE}")
+                            return True
+                        else:
+                            print(f"{INFO_STYLE}Update skipped.{RESET_STYLE}")
             except Exception as e:
                 print(f"{WARNING_STYLE}Could not check for ligma.py updates: {e}{RESET_STYLE}")
                 pass  # Continue even if update check fails
@@ -523,11 +542,15 @@ def get_current_theme():
     return settings.get("theme", "default")
 
 def set_theme(theme_name):
-    """Set the current theme in user settings"""
+    """Set the current theme in user settings and reload it immediately"""
     settings = load_user_settings()
     settings["theme"] = theme_name
     save_user_settings(settings)
-    print(f"{SUCCESS_STYLE}Theme set to {theme_name}. Please restart SigmaOS to apply changes.{RESET_STYLE}")
+    # Reload theme and refresh screen
+    theme = Theme()
+    clear_screen()
+    show_banner()
+    print(f"{SUCCESS_STYLE}Theme {theme_name} applied successfully.{RESET_STYLE}")
 
 def list_themes():
     """List all available themes"""
@@ -770,13 +793,19 @@ def add_alias(name, command):
     aliases = load_aliases()
     aliases[name] = command
     save_aliases(aliases)
+    # Reload aliases into interactive shell's scope
+    global interactive_shell_aliases
+    interactive_shell_aliases = aliases
     print(f"{SUCCESS_STYLE}Added alias: {name} → {command}{RESET_STYLE}")
 
 def remove_alias(name):
     aliases = load_aliases()
     if name in aliases:
-        del aliases
+        del aliases[name]
         save_aliases(aliases)
+        # Reload aliases into interactive shell's scope
+        global interactive_shell_aliases
+        interactive_shell_aliases = aliases
         print(f"{SUCCESS_STYLE}Removed alias: {name}{RESET_STYLE}")
     else:
         print(f"{ERROR_STYLE}Alias not found: {name}{RESET_STYLE}")
@@ -805,7 +834,7 @@ def show_help():
         ("now", "Show current date and time"),
         ("sendlogs", "Send logs to Discord"),
         ("update-ligma", "Force update ligma.py to the latest version"),
-        ("timer <duration> <unit>", "Set a timer (s/m/h). Hidden feature: Type a command during the timer (invisible), press Enter, and it will execute when the timer finishes!"),
+        ("timer <duration> <unit>", "Set a timer (s/m/h)"),
         ]
     for cmd, desc in system_commands:
         print(f"{command_sth}  {cmd:<25}{description_sth} - {desc}")
@@ -1774,7 +1803,10 @@ def interactive_shell():
     
     show_banner()
     show_welcome_message()  # This will only show for new users since it checks PACKAGES_DIR
-    aliases = load_aliases()
+    
+    # Initialize global aliases
+    global interactive_shell_aliases
+    interactive_shell_aliases = load_aliases()
     
     # Ensure ligma module is loaded
     global ligma_module
@@ -1790,6 +1822,7 @@ def interactive_shell():
     
     def handle_exit():
         loading_animation("Shutting down SigmaOS", duration=.5)
+        log_info("Exiting SigmaOS throuhg exit command")
         sys.exit(0)
     
     def handle_clear():
@@ -1846,8 +1879,10 @@ def interactive_shell():
                 print(f"{ERROR_STYLE}Invalid duration. Please enter a number.{RESET_STYLE}")
         else:
             print(f"{WARNING_STYLE}Usage: timer <duration> <unit (s/m/h)>{RESET_STYLE}")
-            print(f"{INFO_STYLE}Pro tip: You can type a command during the timer (you won't see it)")
-            print(f"{INFO_STYLE}and press Enter to execute it when the timer finishes!{RESET_STYLE}")
+            if platform.system() == "Windows":
+                print(f"{INFO_STYLE}Pro tip: You can type a command during the timer (you won't see it)")
+                print(f"{INFO_STYLE}and press Enter to execute it when the timer finishes!{RESET_STYLE}")
+                print(f"{INFO_STYLE}Only works on Windows btw.{RESET_STYLE}")
     
     def handle_rick():
         subprocess.run(["curl", "ascii.live/rick"])
@@ -1907,20 +1942,22 @@ def interactive_shell():
 
             # Split command into parts
             parts = command.split()
-            
+            if not parts:
+                continue
+
+            # Check if command is an alias first using global aliases
+            if parts[0] in interactive_shell_aliases:
+                command = interactive_shell_aliases[parts[0]]
+                if len(parts) > 1:
+                    command += " " + " ".join(parts[1:])
+                parts = command.split()
+
             # Handle package calls with arguments (e.g. "yapper test.txt")
             if parts and is_valid_package(parts[0]):
                 # Store the original arguments
                 sys.argv = parts.copy()  # Make a copy so the original parts list isn't affected
                 run_package(parts[0])
                 continue
-
-            # Check if command is an alias
-            if parts and parts[0] in aliases:
-                command = aliases[parts[0]]
-                if len(parts) > 1:
-                    command += " " + " ".join(parts[1:])
-                parts = command.split()
 
             main_command = parts[0].lower() if parts else ""
             args = parts[1:] if len(parts) > 1 else []
@@ -1946,7 +1983,7 @@ def interactive_shell():
 
         except KeyboardInterrupt:
             print(f"\n{ERROR_STYLE}Interrupted!{RESET_STYLE}")
-            loading_animation("Shutting down SigmaOS")
+            loading_animation("Shutting down SigmaOS", duration=.5)
             sys.exit(0)  # Use sys.exit here too
 
 if __name__ == "__main__":
