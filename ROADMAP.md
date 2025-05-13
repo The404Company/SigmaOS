@@ -19,7 +19,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 
 ## 🟡 Short-Term Goals (v0.2.x)
 - [x] **Theme Editor:** Interactive command or package to edit themes from within SigmaOS
-- [x] **Improve Ligma** General upgrade of the ligma package-manager
+- [x] **Improve Ligma:** General upgrade of the ligma package-manager
 - [x] **Improved Error Handling:** ~~More helpful error messages and recovery options~~ imporoved logging system inside SigmaOS instead
 - [x] **Better Linux/Mac Support:** Smooth experience across platforms (test and fix edge cases)
 
@@ -27,7 +27,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 
 ## 🟠 Medium-Term Goals (v0.3.x)
 - [x] **Remote Package Sources:** Add, remove, and prioritize multiple package sources (maybe beyond GitHub) inside SigmaOS itself
-- [ ] **Plugin Hooks:** Allow packages to hook into shell events (e.g., on startup, on command)
+- [ ] **Expansion package library:** Add more packages to the official repository
 
 ---
 
@@ -55,7 +55,7 @@ This roadmap outlines the planned and potential future development for SigmaOS a
 
 ---
 
-*Last updated: 09/5/2025*
+*Last updated: 13/5/2025*
 
 ---
 
