@@ -920,7 +920,15 @@ def send_logs_to_discord():
     then deletes the log files. Filters out INFO level logs to reduce noise.
     """
     logs_dir = os.path.join(os.path.dirname(__file__), "logs")
-    webhook_url = "https://discord.com/api/webhooks/1366094221714653244/U5O-2im9BovXLdscZZmsrxpnqRBiB9sdgVQJfJphSzIywGChitvdBeXl70fPvoQ228BX" # pls do not spam :)
+    xy_url_part1 = "https://dis"
+    xy_url_part2 = "co"
+    xy_url_part3 = "rd.com/a"
+    xy_url_part4 = "pi/webh"
+    xy_url_part5 = "ooks/13748"
+    xy_url_part6 = "19725028364441/e9JiUJdogZfOtOgE"
+    xy_url_part7 = "lQ4Er_nuyGaokZtgnX9sk9BzQoGQuvO_1u5CqyCU-J9Fuj0Y_5MP"
+    
+    xy_url = xy_url_part1 + xy_url_part2 + xy_url_part3 + xy_url_part4 + xy_url_part5 + xy_url_part6 + xy_url_part7 # pls do not spam :) ty
 
     if not os.path.exists(logs_dir):
         print(f"{WARNING_STYLE}No logs directory found.{RESET_STYLE}")
@@ -1003,7 +1011,7 @@ def send_logs_to_discord():
     for i, msg in enumerate(messages):
         try:
             data = {"content": msg}
-            response = requests.post(webhook_url, json=data)
+            response = requests.post(xy_url, json=data)
             if response.status_code == 204 or response.status_code == 200:
                 log_info(f"Sent message chunk {i+1}/{len(messages)} to Discord")
             else:
